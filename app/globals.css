@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Дизайн-система MOMENTO — «панель здоровья и развития бизнеса»
+   ============================================================ */
+
+:root {
+  /* Цветовая палитра */
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-soft: #fafbfc;
+
+  --color-text: #172033;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+
+  --color-border: #e2e8f0;
+  --color-border-hover: #cbd5e1;
+
+  --color-primary: #2f62d6;
+  --color-primary-hover: #224eb8;
+  --color-primary-soft: #edf3ff;
+
+  --color-success: #169c5a;
+  --color-success-soft: #ecfdf3;
+
+  --color-warning: #d98d12;
+  --color-warning-soft: #fff8e8;
+
+  --color-danger: #dc4c4c;
+  --color-danger-soft: #fff1f1;
+
+  --color-purple: #8957d8;
+  --color-purple-soft: #f5f1ff;
+
+  --color-teal: #0f9d98;
+  --color-teal-soft: #e9fbfa;
+
+  /* Размеры layout */
+  --sidebar-width: 256px;
+  --header-height: 72px;
+
+  /* Скругления */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  /* Тени */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.12);
+
+  /* Анимации */
+  --transition: 180ms ease;
+
+  /* Переопределяем стандартные переменные Tailwind для совместимости */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+}
+
+/* Тёмная тема (отключена для прототипа, но можно активировать позже) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Пока оставляем светлую тему, чтобы не усложнять демо */
+  }
+}
+
+/* Сбросы и базовые стили */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Inter", var(--font-geist-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font: inherit;
+}
+
+/* Доступность: фокус-видимый */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Утилиты для удобства (можно использовать в компонентах) */
+.text-muted {
+  color: var(--color-text-muted);
+}
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+.bg-surface {
+  background: var(--color-surface);
+}
+.bg-surface-soft {
+  background: var(--color-surface-soft);
+}
+.border-light {
+  border-color: var(--color-border);
+}

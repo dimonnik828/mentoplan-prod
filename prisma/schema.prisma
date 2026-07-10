@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id   Int    @id @default(autoincrement())
+  name String @unique @db.VarChar(255)
+
+  @@map("organizations")
+}
+
+model Product {
+  id   Int    @id @default(autoincrement())
+  name String @unique @db.VarChar(500)
+
+  @@map("products")
+}
+
+model TechCard {
+  id                  Int                      @id @default(autoincrement())
+  cardNumber          String                   @unique @map("card_number") @db.VarChar(20)
+  dishName            String                   @map("dish_name")
+  organizationId      Int?                     @map("organization_id")
+  approvalDate        DateTime?                @map("approval_date") @db.Date
+  applicationArea     String?                  @map("application_area") @db.VarChar(255)
+  portionNorm         Decimal?                 @default(1000) @map("portion_norm") @db.Decimal(10, 3)
+  technology          String?
+  technologySource    String?                  @map("technology_source") @db.VarChar(20)
+  servingRequirements String?                  @map("serving_requirements")
+  totalOutputKg       Decimal?                 @map("total_output_kg") @db.Decimal(12, 4)
+  proteinsPer100g     Decimal?                 @map("proteins_per_100g") @db.Decimal(6, 1)
+  fatsPer100g         Decimal?                 @map("fats_per_100g") @db.Decimal(6, 1)
+  carbsPer100g        Decimal?                 @map("carbs_per_100g") @db.Decimal(6, 1)
+  caloriesPer100g     Decimal?                 @map("calories_per_100g") @db.Decimal(8, 1)
+  note                String?
+  sourcePage          Int?                     @map("source_page")
+  createdAt           DateTime?                @default(now()) @map("created_at") @db.Timestamptz(6)
+  search_vector       Unsupported("tsvector")?
+
+  @@map("tech_cards")
+}
+
+model CardIngredient {
+  id            Int      @id @default(autoincrement())
+  cardId        Int      @map("card_id")
+  productId     Int?     @map("product_id")
+  lineNumber    Int?     @map("line_number")
+  grossWeightG  Decimal? @map("gross_weight_g") @db.Decimal(10, 3)
+  netWeightG    Decimal? @map("net_weight_g") @db.Decimal(10, 3)
+  outputG       Decimal? @map("output_g") @db.Decimal(10, 3)
+  grossWeightKg Decimal? @map("gross_weight_kg") @db.Decimal(10, 4)
+  netWeightKg   Decimal? @map("net_weight_kg") @db.Decimal(10, 4)
+  outputKg      Decimal? @map("output_kg") @db.Decimal(10, 4)
+
+  @@map("card_ingredients")
+}
+
+model Audit {
+  id                 String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name               String?
+  address            String
+  totalArea          Int?      @map("total_area")
+  hallArea           Int?      @map("hall_area")
+  seats              Int?
+  staffCount         Int?      @map("staff_count")
+  avgCheck           Int?      @map("avg_check")
+  revenue            Int
+  rent               Int?
+  utilities          Int?
+  payroll            Int?
+  managementCosts    Int?      @map("management_costs")
+  costOfGoods        Int?      @map("cost_of_goods")
+  otherExpenses      Int?      @map("other_expenses")
+  foodCostPercent    Float?    @map("food_cost_percent")
+  payrollPercent     Float?    @map("payroll_percent")
+  rentPercent        Float?    @map("rent_percent")
+  utilitiesPercent   Float?    @map("utilities_percent")
+  managementPercent  Float?    @map("management_percent")
+  otherPercent       Float?    @map("other_percent")
+  profitPercent      Float?    @map("profit_percent")
+  profitAbsolute     Int?      @map("profit_absolute")
+  revenuePerEmployee Int?      @map("revenue_per_employee")
+  revenuePerSeat     Int?      @map("revenue_per_seat")
+  revenuePerSqM      Int?      @map("revenue_per_sqm")
+  healthIndex        Int?      @map("health_index")
+  recommendations    Json
+  checklists         Json?
+  adResources        Json?     @map("ad_resources")
+  organizationId     Int?      @map("organization_id")
+  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audits")
+}
+
+model public_Audit {
+  id              String   @id
+  address         String
+  area            Float
+  revenue         Float
+  employees       Int
+  createdAt       DateTime @default(now())
+  auditSummary    String?
+  recommendations Json?
+  checklists      Json?
+  adResources     Json?
+
+  @@map("Audit")
+}
+
+model TTK {
+  id              Int       @id @default(autoincrement())
+  title           String
+  number          String?   @unique
+  createdAt       DateTime  @default(now())
+  ingredients     Json
+  technology      String
+  presentation    String?
+  storage         String?
+  quality         String?
+  proteins        Float?
+  fats            Float?
+  carbs           Float?
+  calories        Float?
+  engineer        String?
+  responsible     String?
+  applicationArea String?
+  approvalDate    DateTime?
+  category        String?
+  note            String?
+  organization    String?
+  portionNorm     Float?
+  sourcePage      Int?
+  totalOutputKg   Float?
+  type            String    @default("блюдо")
+  normUnit        String?
+  receiptName     String?
+}

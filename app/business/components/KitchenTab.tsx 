@@ -1,0 +1,110 @@
+// ================ КОМПОНЕНТ КУХНИ (НОВАЯ ЛОГИКА) ================
+function KitchenTab({
+  categories,
+  setCategories,
+  cooksCount,
+  setCooksCount,
+  parallelism,
+  setParallelism,
+  commonSettings,
+  kitchenResult,
+  setKitchenResult,
+}: any) {
+  // Веса для распределения времени (в процентах, сумма = 100)
+  const [weights, setWeights] = useState<{ [key: string]: number }>(() => {
+    const initial: { [key: string]: number } = {};
+    categories.forEach((cat: Category) => {
+      initial[cat.id] = 100 / categories.length;
+    });
+    return initial;
+  });
+
+  // При изменении категорий обновляем веса (добавляем новую с равной долей)
+  useEffect(() => {
+    const newWeights: { [key: string]: number } = {};
+    categories.forEach((cat: Category) => {
+      newWeights[cat.id] = weights[cat.id] !== undefined ? weights[cat.id] : 100 / categories.length;
+    });
+    // Нормализуем, чтобы сумма была 100
+    const sum = Object.values(newWeights).reduce((a, b) => a + b, 0);
+    if (sum !== 100) {
+      const factor = 100 / sum;
+      Object.keys(newWeights).forEach((id) => {
+        newWeights[id] = Math.round(newWeights[id] * factor);
+      });
+      // Корректируем последний, чтобы сумма была ровно 100
+      const total = Object.values(newWeights).reduce((a, b) => a + b, 0);
+      if (total !== 100) {
+        const lastKey = Object.keys(newWeights).pop()!;
+        newWeights[lastKey] += 100 - total;
+      }
+    }
+    setWeights(newWeights);
+  }, [categories]);
+
+  const updateWeight = (id: string, value: number) => {
+    setWeights((prev) => {
+      const newWeights = { ...prev, [id]: value };
+      // Нормализуем
+      const sum = Object.values(newWeights).reduce((a, b) => a + b, 0);
+      if (sum !== 100) {
+        const factor = 100 / sum;
+        Object.keys(newWeights).forEach((key) => {
+          newWeights[key] = Math.round(newWeights[key] * factor);
+        });
+        // Корректируем последний
+        const total = Object.values(newWeights).reduce((a, b) => a + b, 0);
+        if (total !== 100) {
+          const lastKey = Object.keys(newWeights).pop()!;
+          newWeights[lastKey] += 100 - total;
+        }
+      }
+      return newWeights;
+    });
+  };
+
+  // Пересчёт
+  useEffect(() => {
+    const shiftMinutes = commonSettings.shiftHours * 60;
+    const prepTime = shiftMinutes * 0.2;
+    const availableTime = shiftMinutes * commonSettings.loadFactor - prepTime;
+    const totalFlowTime = availableTime * cooksCount * parallelism;
+
+    // Распределяем время по весам
+    const categoryResults = categories.map((cat: Category) => {
+      const weight = (weights[cat.id] || 0) / 100;
+      const timeForCategory = totalFlowTime * weight;
+      const dishes = Math.floor(timeForCategory / cat.timePerDish);
+      const revenue = dishes * cat.price;
+      return { ...cat, dishes, revenue, timeUsed: dishes * cat.timePerDish };
+    });
+
+    const totalDishes = categoryResults.reduce((sum, cat) => sum + cat.dishes, 0);
+    const totalRevenue = categoryResults.reduce((sum, cat) => sum + cat.revenue, 0);
+    const totalTimeUsed = categoryResults.reduce((sum, cat) => sum + cat.timeUsed, 0);
+    const utilization = totalFlowTime > 0 ? (totalTimeUsed / totalFlowTime) * 100 : 0;
+
+    const result = {
+      availableTime,
+      prepTime,
+      totalFlowTime,
+      categoryResults,
+      totalDishes,
+      totalRevenue,
+      utilization,
+    };
+    setKitchenResult(result);
+  }, [categories, cooksCount, parallelism, commonSettings, weights, setKitchenResult]);
+
+  const result = kitchenResult || {
+    availableTime: 0,
+    prepTime: 0,
+    totalFlowTime: 0,
+    categoryResults: [],
+    totalDishes: 0,
+    totalRevenue: 0,
+    utilization: 0,
+  };
+
+  // ... (рендер такой же, но вместо оптимального микса показываем таблицу с результатами)
+}
