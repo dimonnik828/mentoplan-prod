@@ -2,955 +2,911 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+  Settings,
+  Armchair,
+  Coffee,
+  Flame,
+  Building,
+  Wind,
+  Gauge,
+  Lightbulb,
+  Plus,
+  X,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  Users,
+  Utensils,
+  Clock,
+  RefreshCw,
+  DollarSign,
+  Info,
+} from 'lucide-react';
 
-// ================ ТИПЫ ================
-interface Category {
+// ============================================================
+// ТИПЫ
+// ============================================================
+interface Dish {
   id: string;
   name: string;
-  timePerDish: number;
+  time: number;
   price: number;
 }
 
 interface CommonSettings {
   shiftHours: number;
   loadFactor: number;
+  prepRatio: number;
+  operatingHours: number;
 }
 
-// ================ ВКЛАДКА ВЕНТИЛЯЦИИ ================
-function VentilationTab() {
-  const [hallArea, setHallArea] = useState(80);
-  const [kitchenArea, setKitchenArea] = useState(30);
-  const [kitchenType, setKitchenType] = useState<'open' | 'closed'>('closed');
-  const [selectedCity, setSelectedCity] = useState({ name: 'Москва', temp: -25 });
-  const [customTemp, setCustomTemp] = useState(-25);
-  const [indoorTemp, setIndoorTemp] = useState(22);
-  const [safetyFactor, setSafetyFactor] = useState(1.1);
+interface HallSettings {
+  venueType: string;
+  seats: number;
+  avgCheck: number;
+  hallArea: number;
+  kitchenArea: number;
+  rent: number;
+  cookSalary: number;
+  baristaSalary: number;
+  waiterSalary: number;
+  dishwasherSalary: number;
+  waiterRatio: number;
+  dishwasherRatio: number;
+  foodCostPercent: number;
+  drinkCostPercent: number;
+}
 
-  const cities = [
-    { name: 'Москва', temp: -25 },
-    { name: 'Санкт-Петербург', temp: -24 },
-    { name: 'Новосибирск', temp: -39 },
-    { name: 'Екатеринбург', temp: -35 },
-    { name: 'Казань', temp: -30 },
-    { name: 'Нижний Новгород', temp: -28 },
-    { name: 'Ростов-на-Дону', temp: -19 },
-    { name: 'Сочи', temp: -5 },
-    { name: 'Владивосток', temp: -23 },
-    { name: 'Хабаровск', temp: -35 },
-    { name: 'Иркутск', temp: -38 },
-    { name: 'Калининград', temp: -18 },
-    { name: 'Свой вариант', temp: null },
-  ];
+interface CoffeeSettings {
+  baristas: number;
+  drinkTime: number;
+  drinkPrice: number;
+}
 
-  const getOutdoorTemp = () => {
-    if (selectedCity.name === 'Свой вариант') {
-      return customTemp;
-    }
-    return selectedCity.temp || -25;
-  };
+interface KitchenSettings {
+  cooks: number;
+  parallelism: number;
+  dishes: Dish[];
+}
 
-  const outdoorTemp = getOutdoorTemp();
-  const deltaT = indoorTemp - outdoorTemp;
+interface VentilationSettings {
+  kitchenType: string;
+  climateZone: number;
+  indoorTemp: number;
+  safetyFactor: number;
+  electricityPrice: number;
+}
 
-  const hallVentilation = hallArea * 3;
-  const kitchenNorm = kitchenType === 'open' ? 50 : 70;
-  const kitchenVentilation = kitchenArea * kitchenNorm;
-  const totalVentilation = hallVentilation + kitchenVentilation;
+// ============================================================
+// КОНСТАНТЫ С НОРМАТИВАМИ
+// ============================================================
+const VENUE_TYPES = {
+  fastfood: {
+    label: 'Быстрое обслуживание',
+    benchmark: 400,
+    hallRate: 4.0,
+    waiterRatio: 0,
+    dishwasherRatio: 50,
+    guestTime: 10,
+    turnsPerShift: 4.5,
+  },
+  coffee: {
+    label: 'Кофейня',
+    benchmark: 300,
+    hallRate: 3.5,
+    waiterRatio: 25,
+    dishwasherRatio: 45,
+    guestTime: 25,
+    turnsPerShift: 3.0,
+  },
+  restaurant: {
+    label: 'Ресторан',
+    benchmark: 150,
+    hallRate: 3.0,
+    waiterRatio: 14,
+    dishwasherRatio: 40,
+    guestTime: 50,
+    turnsPerShift: 1.8,
+  },
+  cafe: {
+    label: 'Кафе',
+    benchmark: 200,
+    hallRate: 3.2,
+    waiterRatio: 20,
+    dishwasherRatio: 45,
+    guestTime: 35,
+    turnsPerShift: 2.2,
+  },
+  canteen: {
+    label: 'Столовая',
+    benchmark: 350,
+    hallRate: 4.5,
+    waiterRatio: 0,
+    dishwasherRatio: 50,
+    guestTime: 20,
+    turnsPerShift: 3.5,
+  },
+};
 
-  const coeff = 0.00034;
-  const powerHall = hallVentilation * coeff * deltaT;
-  const powerKitchen = kitchenVentilation * coeff * deltaT;
-  const powerTotal = (powerHall + powerKitchen) * safetyFactor;
+const VENUE_MIN_AREA_PER_SEAT = {
+  fastfood: 1.4,
+  coffee: 1.6,
+  restaurant: 1.8,
+  cafe: 1.6,
+  canteen: 1.8,
+};
 
-  let recommendation = '';
-  if (powerTotal < 10) {
-    recommendation = 'Электрический калорифер (подойдёт для небольших помещений)';
-  } else if (powerTotal < 50) {
-    recommendation = 'Водяной калорифер (подключение к системе отопления) или тепловой насос';
-  } else {
-    recommendation = 'Промышленная приточная установка с рекуперацией (энергоэффективное решение)';
-  }
+const KITCHEN_TYPE_RATE = { hot: 37.5, cold: 17.5, mixed: 27.5 };
+const CLIMATE_ZONES = [
+  { label: 'Краснодар', temp: -15 },
+  { label: 'Ростов-на-Дону', temp: -22 },
+  { label: 'Санкт-Петербург', temp: -24 },
+  { label: 'Москва', temp: -25 },
+  { label: 'Екатеринбург', temp: -28 },
+  { label: 'Казань', temp: -28 },
+  { label: 'Новосибирск', temp: -32 },
+  { label: 'Якутск', temp: -36 },
+];
+
+// ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ
+// ============================================================
+function SliderWithLabel({ value, onChange, min = 0, max = 100, step = 1, label, unit = '%', description }: any) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</label>
+        <span className="text-sm font-bold text-gray-800">{value}{unit}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-blue-600 bg-gray-200 rounded-lg h-1.5" />
+      {description && <p className="text-[11px] text-gray-400 mt-1">{description}</p>}
+    </div>
+  );
+}
+
+function InputField({ label, value, onChange, type = 'number', min, step, placeholder, unit, description, warning }: any) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{label}</label>
+      <div className="relative">
+        <input
+          type={type}
+          min={min}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
+          className={`w-full bg-white border rounded-lg px-3 py-2 text-gray-800 text-sm focus:ring-1 focus:ring-blue-600/20 outline-none transition ${warning ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-blue-600'}`}
+          placeholder={placeholder}
+        />
+        {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{unit}</span>}
+      </div>
+      {warning && <p className="text-xs text-red-500 mt-1">{warning}</p>}
+      {description && !warning && <p className="text-[11px] text-gray-400 mt-1">{description}</p>}
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options, description }: any) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-800 text-sm focus:border-blue-600 focus:ring-1 focus:ring-blue-600/20 outline-none transition appearance-none">
+        {options.map((opt: any) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+      </select>
+      {description && <p className="text-[11px] text-gray-400 mt-1">{description}</p>}
+    </div>
+  );
+}
+
+// ============================================================
+// БЛОК ФОТ И ШТАТ
+// ============================================================
+function PayrollBlock({ cooksCount, cookSalary, baristasCount, baristaSalary, seats, waiterRatio, waiterSalary, hallArea, dishwasherRatio, dishwasherSalary, operatingHours, shiftHours }: any) {
+  const shifts = Math.max(1, Math.ceil(operatingHours / shiftHours));
+  const waitersCount = waiterRatio > 0 ? Math.max(1, Math.ceil(seats / waiterRatio)) : 0;
+  const dishwashersCount = Math.max(1, Math.ceil(hallArea / dishwasherRatio));
+  const cooksTotal = cooksCount * shifts;
+  const baristasTotal = baristasCount * shifts;
+  const waitersTotal = waitersCount * shifts;
+  const dishwashersTotal = dishwashersCount * shifts;
+  const totalStaff = cooksTotal + baristasTotal + waitersTotal + dishwashersTotal;
+  const cooksPayroll = cooksTotal * cookSalary;
+  const baristasPayroll = baristasTotal * baristaSalary;
+  const waitersPayroll = waitersTotal * waiterSalary;
+  const dishwashersPayroll = dishwashersTotal * dishwasherSalary;
+  const totalPayroll = cooksPayroll + baristasPayroll + waitersPayroll + dishwashersPayroll;
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">🌬️ Расчёт вентиляции и тепловой мощности</h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium">Площадь зала (м²)</label>
-          <input
-            type="number"
-            min="1"
-            value={hallArea}
-            onChange={(e) => setHallArea(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Площадь кухни (м²)</label>
-          <input
-            type="number"
-            min="1"
-            value={kitchenArea}
-            onChange={(e) => setKitchenArea(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Тип кухни</label>
-          <select
-            value={kitchenType}
-            onChange={(e) => setKitchenType(e.target.value as 'open' | 'closed')}
-            className="w-full p-2 border rounded"
-          >
-            <option value="open">Открытая (интегрирована в зал)</option>
-            <option value="closed">Закрытая (изолированная)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Климатическая зона (город)</label>
-          <select
-            value={selectedCity.name}
-            onChange={(e) => {
-              const city = cities.find(c => c.name === e.target.value);
-              if (city) setSelectedCity(city);
-            }}
-            className="w-full p-2 border rounded"
-          >
-            {cities.map((city) => (
-              <option key={city.name} value={city.name}>
-                {city.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {selectedCity.name === 'Свой вариант' && (
-          <div>
-            <label className="block text-sm font-medium">Температура наружного воздуха (°C)</label>
-            <input
-              type="number"
-              value={customTemp}
-              onChange={(e) => setCustomTemp(Number(e.target.value))}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-        )}
-        <div>
-          <label className="block text-sm font-medium">Желаемая температура в помещении (°C)</label>
-          <input
-            type="number"
-            min="16"
-            max="28"
-            value={indoorTemp}
-            onChange={(e) => setIndoorTemp(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Коэффициент запаса</label>
-          <input
-            type="range"
-            min="1.0"
-            max="1.3"
-            step="0.05"
-            value={safetyFactor}
-            onChange={(e) => setSafetyFactor(Number(e.target.value))}
-            className="w-full"
-          />
-          <span className="text-sm">{safetyFactor.toFixed(2)}</span>
-        </div>
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><DollarSign className="w-4 h-4 text-blue-600" /> ФОТ и штат</h4>
+      <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+        <div className="text-gray-500">Режим работы</div>
+        <div className="text-right font-medium">{operatingHours} ч/день, {shiftHours} ч/смена → {shifts} смен{shifts > 1 ? 'ы' : ''}</div>
       </div>
-
-      <div className="mb-4 p-3 bg-blue-50 rounded">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <span className="text-sm text-gray-600">Воздухообмен зала</span>
-            <div className="text-2xl font-bold">{Math.round(hallVentilation)} м³/час</div>
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Воздухообмен кухни</span>
-            <div className="text-2xl font-bold">{Math.round(kitchenVentilation)} м³/час</div>
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Общий воздухообмен</span>
-            <div className="text-2xl font-bold">{Math.round(totalVentilation)} м³/час</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4 p-3 bg-green-50 rounded">
-        <h3 className="font-semibold mb-2">Тепловая мощность (для нагрева приточного воздуха)</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <span className="text-sm text-gray-600">Зал</span>
-            <div className="text-2xl font-bold text-orange-700">{powerHall.toFixed(1)} кВт</div>
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Кухня</span>
-            <div className="text-2xl font-bold text-orange-700">{powerKitchen.toFixed(1)} кВт</div>
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Общая (с учётом запаса)</span>
-            <div className="text-2xl font-bold text-red-700">{powerTotal.toFixed(1)} кВт</div>
-          </div>
-        </div>
-        <div className="mt-2 text-sm text-gray-500">
-          ΔT = {indoorTemp}°C - ({outdoorTemp}°C) = {deltaT.toFixed(0)}°C
-        </div>
-      </div>
-
-      <div className="p-3 bg-yellow-50 rounded">
-        <h4 className="font-medium">Рекомендация по оборудованию</h4>
-        <p className="text-sm">{recommendation}</p>
-        <p className="text-sm mt-1 text-gray-600">
-          Для поддержания комфортной температуры в холодное время года рекомендуемая мощность системы отопления/вентиляции.
-        </p>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between"><span className="text-gray-600">Повара</span><span className="font-medium">{cooksTotal} чел. ({cooksCount} в смену) — {Math.round(cooksPayroll).toLocaleString('ru-RU')} ₽</span></div>
+        <div className="flex justify-between"><span className="text-gray-600">Бариста</span><span className="font-medium">{baristasTotal} чел. ({baristasCount} в смену) — {Math.round(baristasPayroll).toLocaleString('ru-RU')} ₽</span></div>
+        {waitersTotal > 0 && <div className="flex justify-between"><span className="text-gray-600">Официанты</span><span className="font-medium">{waitersTotal} чел. ({waitersCount} в смену, {waiterRatio} гостей/оф.) — {Math.round(waitersPayroll).toLocaleString('ru-RU')} ₽</span></div>}
+        <div className="flex justify-between"><span className="text-gray-600">Мойщицы</span><span className="font-medium">{dishwashersTotal} чел. ({dishwashersCount} в смену, {dishwasherRatio} м²/чел.) — {Math.round(dishwashersPayroll).toLocaleString('ru-RU')} ₽</span></div>
+        <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold text-gray-800"><span>Итого штат / ФОТ в месяц</span><span className="text-blue-600">{totalStaff} чел. · {Math.round(totalPayroll).toLocaleString('ru-RU')} ₽</span></div>
       </div>
     </div>
   );
 }
 
-// ================ ВКЛАДКА КУХНИ ================
-function KitchenTab({
-  categories,
-  setCategories,
-  cooksCount,
-  setCooksCount,
-  parallelism,
-  setParallelism,
-  commonSettings,
-  kitchenResult,
-  setKitchenResult,
-}: any) {
-  useEffect(() => {
-    const shiftMinutes = commonSettings.shiftHours * 60;
-    const prepTime = shiftMinutes * 0.2;
-    const availableTime = shiftMinutes * commonSettings.loadFactor - prepTime;
-    const totalFlowTime = availableTime * cooksCount * parallelism;
-
-    const categoryCount = categories.length;
-    const timePerCategory = categoryCount > 0 ? totalFlowTime / categoryCount : 0;
-
-    const categoryResults = categories.map((cat: Category) => {
-      const dishes = Math.floor(timePerCategory / cat.timePerDish);
-      const revenue = dishes * cat.price;
-      return { ...cat, dishes, revenue, timeUsed: dishes * cat.timePerDish };
-    });
-
-    const totalDishes = categoryResults.reduce((sum, cat) => sum + cat.dishes, 0);
-    const totalRevenue = categoryResults.reduce((sum, cat) => sum + cat.revenue, 0);
-    const totalTimeUsed = categoryResults.reduce((sum, cat) => sum + cat.timeUsed, 0);
-    const utilization = totalFlowTime > 0 ? (totalTimeUsed / totalFlowTime) * 100 : 0;
-
-    const result = {
-      availableTime,
-      prepTime,
-      totalFlowTime,
-      categoryResults,
-      totalDishes,
-      totalRevenue,
-      utilization,
-    };
-    setKitchenResult(result);
-  }, [categories, cooksCount, parallelism, commonSettings, setKitchenResult]);
-
-  const result = kitchenResult || {
-    availableTime: 0,
-    prepTime: 0,
-    totalFlowTime: 0,
-    categoryResults: [],
-    totalDishes: 0,
-    totalRevenue: 0,
-    utilization: 0,
-  };
-
-  const addCategory = () => {
-    setCategories([...categories, { id: String(Date.now()), name: 'Новая категория', timePerDish: 15, price: 400 }]);
-  };
-  const removeCategory = (id: string) => {
-    setCategories(categories.filter((c: Category) => c.id !== id));
-  };
-  const updateCategory = (id: string, field: string, value: any) => {
-    setCategories(categories.map((c: Category) => (c.id === id ? { ...c, [field]: value } : c)));
-  };
-
+// ============================================================
+// КОМПОНЕНТ МОДАЛЬНОГО ОКНА ДЛЯ ПОДСКАЗОК
+// ============================================================
+function HelpModal({ isOpen, onClose, title, children }: any) {
+  if (!isOpen) return null;
   return (
-    <div className="p-4 bg-white rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">🍳 Расчёт производительности кухни</h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium">Количество поваров</label>
-          <input
-            type="number"
-            min="1"
-            max="20"
-            value={cooksCount}
-            onChange={(e) => setCooksCount(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
+    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
+            <X className="w-6 h-6" />
+          </button>
         </div>
-        <div>
-          <label className="block text-sm font-medium">Параллельность (блюд на повара)</label>
-          <input
-            type="number"
-            min="1"
-            max="5"
-            step="1"
-            value={parallelism}
-            onChange={(e) => setParallelism(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-          <span className="text-xs text-gray-500">Сколько блюд одновременно готовит 1 повар</span>
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Общее потоко-время</label>
-          <div className="text-lg font-semibold">
-            {Math.round(result.totalFlowTime).toLocaleString('ru-RU')} мин
-          </div>
-          <span className="text-xs text-gray-500">
-            ({cooksCount} × {parallelism} потоков)
-          </span>
-        </div>
-      </div>
-
-      <div className="mb-4 p-3 bg-blue-50 rounded">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <span className="text-sm text-gray-600">Доступное время (с учётом заготовок)</span>
-            <div className="text-2xl font-bold">{Math.round(result.availableTime).toLocaleString('ru-RU')} мин</div>
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Общее количество блюд (равномерное распределение)</span>
-            <div className="text-2xl font-bold">{result.totalDishes.toLocaleString('ru-RU')}</div>
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Максимальная выручка</span>
-            <div className="text-2xl font-bold text-green-700">{result.totalRevenue.toLocaleString('ru-RU')} ₽</div>
-          </div>
-        </div>
-        <div className="mt-2 text-sm text-gray-500">
-          Загрузка: {result.utilization.toFixed(0)}% (время на заготовки: {Math.round(result.prepTime).toLocaleString('ru-RU')} мин)
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="font-medium">Категории блюд (равномерное распределение)</h3>
-        <button
-          onClick={addCategory}
-          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-        >
-          + Добавить категорию
-        </button>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 text-left">Название</th>
-              <th className="p-2 text-left">Время (мин)</th>
-              <th className="p-2 text-left">Цена (₽)</th>
-              <th className="p-2 text-left">Блюд</th>
-              <th className="p-2 text-left">Выручка</th>
-              <th className="p-2 text-left"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.categoryResults.map((cat: any) => (
-              <tr key={cat.id} className="border-b">
-                <td className="p-2">
-                  <input
-                    type="text"
-                    value={cat.name}
-                    onChange={(e) => updateCategory(cat.id, 'name', e.target.value)}
-                    className="w-full p-1 border rounded"
-                  />
-                </td>
-                <td className="p-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={cat.timePerDish}
-                    onChange={(e) => updateCategory(cat.id, 'timePerDish', Number(e.target.value))}
-                    className="w-20 p-1 border rounded"
-                  />
-                </td>
-                <td className="p-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="10"
-                    value={cat.price}
-                    onChange={(e) => updateCategory(cat.id, 'price', Number(e.target.value))}
-                    className="w-24 p-1 border rounded"
-                  />
-                </td>
-                <td className="p-2 font-semibold">{cat.dishes.toLocaleString('ru-RU')}</td>
-                <td className="p-2">{cat.revenue.toLocaleString('ru-RU')} ₽</td>
-                <td className="p-2">
-                  <button
-                    onClick={() => removeCategory(cat.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    ✕
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="font-bold bg-gray-50">
-              <td colSpan={3} className="p-2 text-right">Итого:</td>
-              <td className="p-2">{result.totalDishes.toLocaleString('ru-RU')}</td>
-              <td className="p-2 text-green-700">{result.totalRevenue.toLocaleString('ru-RU')} ₽</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ================ ВКЛАДКА КОФЕЙНИ ================
-function CoffeeTab({
-  baristasCount,
-  setBaristasCount,
-  timePerDrink,
-  setTimePerDrink,
-  avgDrinkPrice,
-  setAvgDrinkPrice,
-  coffeeResult,
-}: any) {
-  return (
-    <div className="p-4 bg-white rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">☕ Расчёт производительности кофейни</h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium">Количество бариста</label>
-          <input
-            type="number"
-            min="1"
-            max="10"
-            value={baristasCount}
-            onChange={(e) => setBaristasCount(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Время на 1 напиток (сек)</label>
-          <input
-            type="number"
-            min="30"
-            max="180"
-            step="5"
-            value={timePerDrink}
-            onChange={(e) => setTimePerDrink(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Средняя цена напитка (₽)</label>
-          <input
-            type="number"
-            min="50"
-            step="10"
-            value={avgDrinkPrice}
-            onChange={(e) => setAvgDrinkPrice(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded">
-        <div>
-          <div className="text-sm text-gray-600">Максимум напитков за смену</div>
-          <div className="text-3xl font-bold">{coffeeResult?.maxDrinks?.toLocaleString('ru-RU') || 0}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600">Максимальная выручка</div>
-          <div className="text-3xl font-bold text-green-700">{coffeeResult?.revenue?.toLocaleString('ru-RU') || 0} ₽</div>
+        <div className="p-5 text-sm text-gray-700 space-y-2">
+          {children}
         </div>
       </div>
     </div>
   );
 }
 
-// ================ ВКЛАДКА ЗАЛА ================
-function HallTab({
-  seats,
-  setSeats,
-  avgStayTime,
-  setAvgStayTime,
-  avgCheck,
-  setAvgCheck,
-  hallLoadFactor,
-  setHallLoadFactor,
-  hallResult,
-}: any) {
-  const formats = [
-    {
-      id: 'coffee-small',
-      label: 'Кофейня (4–6 мест)',
-      defaultSeats: 4,
-      avgStayTime: 30,
-      hallLoadFactor: 0.8,
-      avgCheck: 350,
-      guestsPerDay: 76,
-      description: 'Средняя успешная кофейня в Москве',
-    },
-    {
-      id: 'coffee-medium',
-      label: 'Кофейня (10–15 мест)',
-      defaultSeats: 12,
-      avgStayTime: 30,
-      hallLoadFactor: 0.75,
-      avgCheck: 400,
-      guestsPerDay: 150,
-      description: 'Для нормальной окупаемости',
-    },
-    {
-      id: 'coffee-food',
-      label: 'Кофейня с едой',
-      defaultSeats: 20,
-      avgStayTime: 45,
-      hallLoadFactor: 0.7,
-      avgCheck: 500,
-      guestsPerDay: 150,
-      description: 'Новый формат «Кофе Хауз»',
-    },
-    {
-      id: 'cafe-franchise',
-      label: 'Кафе (франшиза)',
-      defaultSeats: 40,
-      avgStayTime: 60,
-      hallLoadFactor: 0.75,
-      avgCheck: 500,
-      guestsPerDay: 200,
-      description: 'Успешный проект',
-    },
-    {
-      id: 'restaurant-weekday',
-      label: 'Ресторан (будни)',
-      defaultSeats: 60,
-      avgStayTime: 90,
-      hallLoadFactor: 0.6,
-      avgCheck: 1200,
-      guestsPerDay: 70,
-      description: 'Средний ресторан в будни',
-    },
-    {
-      id: 'restaurant-weekend',
-      label: 'Ресторан (выходные)',
-      defaultSeats: 60,
-      avgStayTime: 90,
-      hallLoadFactor: 0.85,
-      avgCheck: 1500,
-      guestsPerDay: 120,
-      description: 'Средний ресторан в выходные',
-    },
-    {
-      id: 'custom',
-      label: 'Свой вариант',
-      defaultSeats: 40,
-      avgStayTime: 60,
-      hallLoadFactor: 0.7,
-      avgCheck: 500,
-      guestsPerDay: 0,
-      description: 'Настройте параметры вручную',
-    },
-  ];
-
-  const [selectedFormat, setSelectedFormat] = useState(formats[3]);
-
-  const applyFormat = (format: any) => {
-    setSelectedFormat(format);
-    if (format.id !== 'custom') {
-      setSeats(format.defaultSeats);
-      setAvgStayTime(format.avgStayTime);
-      setHallLoadFactor(format.hallLoadFactor);
-      setAvgCheck(format.avgCheck);
-    }
-  };
-
-  const shiftMinutes = 8 * 60;
-  const cycles = shiftMinutes / avgStayTime;
-  const maxGuests = Math.floor(cycles * seats * hallLoadFactor);
-  const revenue = maxGuests * avgCheck;
-  const recommendedGuests = selectedFormat.guestsPerDay;
-
-  return (
-    <div className="p-4 bg-white rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">🪑 Расчёт пропускной способности зала</h2>
-
-      <div className="mb-4">
-        <label className="block text-sm font-medium">Тип заведения</label>
-        <select
-          value={selectedFormat.id}
-          onChange={(e) => {
-            const format = formats.find((f) => f.id === e.target.value);
-            if (format) applyFormat(format);
-          }}
-          className="w-full md:w-1/2 p-2 border rounded"
-        >
-          {formats.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        {selectedFormat.description && (
-          <p className="text-xs text-gray-500 mt-1">{selectedFormat.description}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium">Количество мест</label>
-          <input
-            type="number"
-            min="1"
-            value={seats}
-            onChange={(e) => setSeats(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Среднее время гостя (мин)</label>
-          <input
-            type="number"
-            min="15"
-            max="180"
-            step="5"
-            value={avgStayTime}
-            onChange={(e) => setAvgStayTime(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Средний чек (₽)</label>
-          <input
-            type="number"
-            min="100"
-            step="50"
-            value={avgCheck}
-            onChange={(e) => setAvgCheck(Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Загрузка зала</label>
-          <input
-            type="range"
-            min="0.4"
-            max="1.0"
-            step="0.05"
-            value={hallLoadFactor}
-            onChange={(e) => setHallLoadFactor(Number(e.target.value))}
-            className="w-full"
-          />
-          <span className="text-sm">{Math.round(hallLoadFactor * 100)}%</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded">
-        <div>
-          <div className="text-sm text-gray-600">Максимум гостей за смену</div>
-          <div className="text-3xl font-bold">{maxGuests.toLocaleString('ru-RU')}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600">Максимальная выручка зала</div>
-          <div className="text-3xl font-bold text-green-700">{revenue.toLocaleString('ru-RU')} ₽</div>
-        </div>
-      </div>
-
-      {recommendedGuests > 0 && (
-        <div className="mt-4 p-4 bg-yellow-50 rounded border border-yellow-200">
-          <h4 className="font-semibold text-yellow-800">📊 Ориентир для вашего формата</h4>
-          <p className="text-sm">
-            <span className="font-medium">Рекомендуемое количество гостей в день:</span>{' '}
-            <span className="font-bold text-lg">{recommendedGuests}</span>
-          </p>
-          {maxGuests < recommendedGuests * 0.8 && (
-            <p className="text-sm text-red-600 mt-1">
-              ⚠️ Ваш расчёт ({maxGuests} гостей) значительно ниже рыночного ориентира.
-              Рассмотрите возможность увеличить количество мест, сократить время пребывания или повысить загрузку.
-            </p>
-          )}
-          {maxGuests >= recommendedGuests * 0.8 && maxGuests <= recommendedGuests * 1.2 && (
-            <p className="text-sm text-green-600 mt-1">
-              ✅ Ваш расчёт ({maxGuests} гостей) близок к рыночному ориентиру. Отличный показатель!
-            </p>
-          )}
-          {maxGuests > recommendedGuests * 1.2 && (
-            <p className="text-sm text-blue-600 mt-1">
-              🚀 Ваш расчёт ({maxGuests} гостей) превышает средний ориентир.
-              Убедитесь, что у вас достаточно мощностей кухни и персонала для обслуживания такого потока.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ================ ВКЛАДКА СВОДКИ ================
-function SummaryTab({ summary }: any) {
-  return (
-    <div className="p-4 bg-white rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">📈 Сводка по бизнесу</h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="p-4 bg-orange-50 rounded">
-          <div className="text-sm text-gray-600">🍳 Кухня</div>
-          <div className="text-2xl font-bold">{summary.kitchenRevenue.toLocaleString('ru-RU')} ₽</div>
-        </div>
-        <div className="p-4 bg-blue-50 rounded">
-          <div className="text-sm text-gray-600">☕ Кофейня</div>
-          <div className="text-2xl font-bold">{summary.coffeeRevenue.toLocaleString('ru-RU')} ₽</div>
-        </div>
-        <div className="p-4 bg-purple-50 rounded">
-          <div className="text-sm text-gray-600">🪑 Зал</div>
-          <div className="text-2xl font-bold">{summary.hallRevenue.toLocaleString('ru-RU')} ₽</div>
-        </div>
-      </div>
-
-      <div className="p-4 bg-green-50 rounded mb-4">
-        <div className="text-sm text-gray-600">Общая потенциальная выручка (с учётом ограничений)</div>
-        <div className="text-3xl font-bold text-green-700">{summary.totalRevenue.toLocaleString('ru-RU')} ₽</div>
-        <div className="text-sm text-gray-500 mt-1">
-          Ограничение: {summary.bottleneck || 'нет'}
-        </div>
-      </div>
-
-      <div className="p-4 bg-yellow-50 rounded">
-        <h4 className="font-medium">Рекомендация</h4>
-        <p className="text-sm">{summary.recommendation}</p>
-        {summary.bottleneck === 'Зал' && (
-          <ul className="text-sm list-disc pl-5 mt-2">
-            <li>Увеличьте количество посадочных мест (если позволяет площадь).</li>
-            <li>Ускорьте обслуживание (меньше времени на приём заказа, быстрая подача).</li>
-            <li>Внедрите предварительную запись или доставку, чтобы разгрузить зал.</li>
-          </ul>
-        )}
-        {summary.bottleneck === 'Кухня/кофейня' && (
-          <ul className="text-sm list-disc pl-5 mt-2">
-            <li>Нанять дополнительных поваров или бариста.</li>
-            <li>Оптимизировать процессы (улучшить организацию рабочего места, предварительная подготовка).</li>
-            <li>Пересмотреть меню (убрать долгие позиции или упростить их).</li>
-          </ul>
-        )}
-        {summary.bottleneck === 'Баланс' && summary.totalRevenue > 0 && (
-          <p className="text-sm mt-2">Отличный баланс! Вы можете масштабировать бизнес, сохраняя текущие пропорции.</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ================ ГЛАВНАЯ СТРАНИЦА ================
+// ============================================================
+// ОСНОВНАЯ СТРАНИЦА
+// ============================================================
 export default function BusinessPage() {
-  const [commonSettings, setCommonSettings] = useState<CommonSettings>({
-    shiftHours: 8,
-    loadFactor: 0.75,
+  const [common, setCommon] = useState<CommonSettings>({ shiftHours: 8, loadFactor: 75, prepRatio: 20, operatingHours: 14 });
+  const [hall, setHall] = useState<HallSettings>({
+    venueType: 'cafe',
+    seats: 50,
+    avgCheck: 500,
+    hallArea: 75,
+    kitchenArea: 40,
+    rent: 120000,
+    cookSalary: 80000,
+    baristaSalary: 60000,
+    waiterSalary: 50000,
+    dishwasherSalary: 40000,
+    waiterRatio: 20,
+    dishwasherRatio: 45,
+    foodCostPercent: 30,
+    drinkCostPercent: 25,
   });
+  const [coffee, setCoffee] = useState<CoffeeSettings>({ baristas: 2, drinkTime: 55, drinkPrice: 250 });
+  const [kitchen, setKitchen] = useState<KitchenSettings>({
+    cooks: 2,
+    parallelism: 3,
+    dishes: [
+      { id: '1', name: 'Салаты', time: 10, price: 350 },
+      { id: '2', name: 'Горячее', time: 35, price: 650 },
+      { id: '3', name: 'Пицца', time: 15, price: 550 },
+      { id: '4', name: 'Десерты', time: 8, price: 300 },
+    ],
+  });
+  const [ventilation, setVentilation] = useState<VentilationSettings>({
+    kitchenType: 'hot',
+    climateZone: -25,
+    indoorTemp: 22,
+    safetyFactor: 1.1,
+    electricityPrice: 5.5,
+  });
+  const [results, setResults] = useState<any>(null);
+  const [helpModal, setHelpModal] = useState<{ block: string; open: boolean }>({ block: '', open: false });
 
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Салаты', timePerDish: 10, price: 350 },
-    { id: '2', name: 'Горячее', timePerDish: 35, price: 650 },
-    { id: '3', name: 'Пицца', timePerDish: 15, price: 550 },
-    { id: '4', name: 'Десерты', timePerDish: 8, price: 300 },
-  ]);
-  const [cooksCount, setCooksCount] = useState(3);
-  const [parallelism, setParallelism] = useState(2);
-  const [kitchenResult, setKitchenResult] = useState<any>(null);
-
-  const [baristasCount, setBaristasCount] = useState(2);
-  const [timePerDrink, setTimePerDrink] = useState(75);
-  const [avgDrinkPrice, setAvgDrinkPrice] = useState(250);
-  const [coffeeResult, setCoffeeResult] = useState<any>(null);
-
-  const [seats, setSeats] = useState(40);
-  const [avgStayTime, setAvgStayTime] = useState(60);
-  const [avgCheck, setAvgCheck] = useState(500);
-  const [hallLoadFactor, setHallLoadFactor] = useState(0.8);
-  const [hallResult, setHallResult] = useState<any>(null);
-
-  const [activeTab, setActiveTab] = useState<'kitchen' | 'coffee' | 'hall' | 'ventilation' | 'summary'>('kitchen');
-
-  const calcCoffee = () => {
-    const shiftSeconds = commonSettings.shiftHours * 3600;
-    const availableSeconds = shiftSeconds * commonSettings.loadFactor * baristasCount;
-    const maxDrinks = Math.floor(availableSeconds / timePerDrink);
-    const result = { maxDrinks, revenue: maxDrinks * avgDrinkPrice };
-    setCoffeeResult(result);
-    return result;
-  };
-
-  const calcHall = () => {
-    const shiftMinutes = commonSettings.shiftHours * 60;
-    const cycles = shiftMinutes / avgStayTime;
-    const maxGuests = Math.floor(cycles * seats * hallLoadFactor);
-    const result = { maxGuests, revenue: maxGuests * avgCheck };
-    setHallResult(result);
-    return result;
-  };
-
-  useEffect(() => {
-    calcCoffee();
-  }, [commonSettings, baristasCount, timePerDrink, avgDrinkPrice]);
-
-  useEffect(() => {
-    calcHall();
-  }, [commonSettings, seats, avgStayTime, avgCheck, hallLoadFactor]);
-
-  const getSummary = () => {
-    const kitchenRevenue = kitchenResult?.totalRevenue || 0;
-    const coffeeRevenue = coffeeResult?.revenue || 0;
-    const hallRevenue = hallResult?.revenue || 0;
-
-    const totalFOH = kitchenRevenue + coffeeRevenue;
-    const hallCapacity = hallRevenue;
-    let totalRevenue = 0;
-    let bottleneck: string | null = null;
-    let recommendation = '';
-
-    if (totalFOH > 0 && hallCapacity > 0) {
-      totalRevenue = Math.min(totalFOH, hallCapacity);
-      if (totalFOH > hallCapacity) {
-        bottleneck = 'Зал';
-        recommendation = 'Зал является узким местом. Увеличьте количество мест или сократите время пребывания гостей.';
-      } else if (totalFOH < hallCapacity) {
-        bottleneck = 'Кухня/кофейня';
-        recommendation = 'Кухня или кофейня не успевают за потоком гостей. Увеличьте количество поваров/бариста или сократите время приготовления.';
-      } else {
-        bottleneck = 'Баланс';
-        recommendation = 'Баланс достигнут. Все зоны работают синхронно.';
-      }
-    } else {
-      totalRevenue = totalFOH + hallCapacity;
-      recommendation = 'Нет данных для расчёта.';
+  const applyVenueDefaults = (venueType: string) => {
+    const venue = VENUE_TYPES[venueType as keyof typeof VENUE_TYPES];
+    if (venue) {
+      setHall((prev) => ({
+        ...prev,
+        venueType,
+        waiterRatio: venue.waiterRatio,
+        dishwasherRatio: venue.dishwasherRatio,
+      }));
     }
-
-    return { totalRevenue, bottleneck, recommendation, kitchenRevenue, coffeeRevenue, hallRevenue };
   };
 
-  const summary = getSummary();
+  const recommendedHallArea = Math.round(hall.seats * (VENUE_MIN_AREA_PER_SEAT[hall.venueType as keyof typeof VENUE_MIN_AREA_PER_SEAT] || 1.6));
+  const hallAreaWarning = hall.hallArea < recommendedHallArea ? `Площадь зала (${hall.hallArea} м²) меньше рекомендуемой (${recommendedHallArea} м²) для вашего формата.` : undefined;
+  const recommendedKitchenArea = kitchen.cooks * 5;
+  const kitchenAreaWarning = hall.kitchenArea < recommendedKitchenArea ? `Площадь кухни (${hall.kitchenArea} м²) меньше рекомендуемой (${recommendedKitchenArea} м²) для ${kitchen.cooks} поваров.` : undefined;
 
+  const addDish = () => setKitchen((prev) => ({ ...prev, dishes: [...prev.dishes, { id: String(Date.now()), name: 'Новое', time: 15, price: 400 }] }));
+  const removeDish = (id: string) => { if (kitchen.dishes.length <= 1) return; setKitchen((prev) => ({ ...prev, dishes: prev.dishes.filter((d) => d.id !== id) })); };
+  const updateDish = (id: string, field: keyof Dish, value: any) => { setKitchen((prev) => ({ ...prev, dishes: prev.dishes.map((d) => (d.id === id ? { ...d, [field]: value } : d)) })); };
+
+  useEffect(() => {
+    const shiftMin = common.shiftHours * 60;
+    const load = common.loadFactor / 100;
+    const prepR = common.prepRatio / 100;
+    const prepMin = shiftMin * prepR;
+    const availMin = shiftMin * load - prepMin;
+
+    // Кухня
+    const cooks = Math.max(0, kitchen.cooks);
+    const par = Math.max(1, kitchen.parallelism);
+    const cap = availMin * cooks * par;
+    const nCat = kitchen.dishes.length;
+    const capPerCat = nCat > 0 ? cap / nCat : 0;
+    let totalDishes = 0, kitchenRev = 0, totalCookMin = 0;
+    const dishRes = kitchen.dishes.map((d) => {
+      const maxD = nCat > 0 ? Math.floor(capPerCat / Math.max(1, d.time)) : 0;
+      const rev = maxD * d.price;
+      totalDishes += maxD;
+      kitchenRev += rev;
+      totalCookMin += maxD * d.time;
+      return { ...d, maxDishes: maxD, revenue: rev };
+    });
+    const kitchenLoad = cap > 0 ? (totalCookMin / cap) * 100 : 0;
+
+    // Кофейня
+    const baristas = Math.max(0, coffee.baristas);
+    const drinkTime = Math.max(1, coffee.drinkTime);
+    const drinkPrice = Math.max(1, coffee.drinkPrice);
+    const coffeeCap = baristas > 0 ? (availMin * 60 / drinkTime) * baristas : 0;
+    const coffeeRev = coffeeCap * drinkPrice;
+
+    // Зал
+    const venueKey = hall.venueType as keyof typeof VENUE_TYPES;
+    const venue = VENUE_TYPES[venueKey];
+    const seats = Math.max(1, hall.seats);
+    const avgCheck = Math.max(1, hall.avgCheck);
+    const turnsPerShift = venue.turnsPerShift || 2.0;
+    const guestTime = venue.guestTime || 30;
+
+    const maxGuestsWithoutLoad = Math.floor(seats * turnsPerShift);
+    const maxGuestsPerShift = Math.floor(seats * turnsPerShift * load);
+    const realisticGuestsPerShift = maxGuestsPerShift;
+    const realisticShiftRevenue = realisticGuestsPerShift * avgCheck;
+    const hallRevPerShift = maxGuestsWithoutLoad * avgCheck;
+
+    // Производство
+    const productionCapPerShift = kitchenRev + coffeeRev;
+    const shiftRevenue = Math.min(realisticShiftRevenue, productionCapPerShift);
+    const bottleneck = realisticShiftRevenue <= productionCapPerShift ? 'Зал' : 'Производство';
+
+    // Смены
+    const shifts = Math.max(1, Math.ceil(common.operatingHours / common.shiftHours));
+    const dailyRevenue = shiftRevenue * shifts;
+    const monthlyRevenue = dailyRevenue * 30;
+
+    // Аренда
+    const rentVal = Math.max(0, hall.rent);
+    const normalRent = monthlyRevenue * 0.14;
+    const rentShare = monthlyRevenue > 0 ? (rentVal / monthlyRevenue) * 100 : 0;
+
+    // Вентиляция
+    const hallRate = venue.hallRate;
+    const kitRate = KITCHEN_TYPE_RATE[ventilation.kitchenType as keyof typeof KITCHEN_TYPE_RATE] || 27.5;
+    const ventHall = Math.round(hall.hallArea * hallRate);
+    const ventKit = Math.round(hall.kitchenArea * kitRate);
+    const ventTotal = ventHall + ventKit;
+    const outTemp = ventilation.climateZone;
+    const inTemp = ventilation.indoorTemp;
+    const dT = inTemp - outTemp;
+    const sf = Math.max(1, ventilation.safetyFactor);
+    const heatH = (ventHall * dT * 0.335) / 1000;
+    const heatK = (ventKit * dT * 0.335) / 1000;
+    const heatTotal = (heatH + heatK) * sf;
+    const monthlyHeatingCost = heatTotal * 720 * ventilation.electricityPrice;
+
+    // ФОТ
+    const waitersCount = hall.waiterRatio > 0 ? Math.max(1, Math.ceil(hall.seats / hall.waiterRatio)) : 0;
+    const dishwashersCount = Math.max(1, Math.ceil(hall.hallArea / hall.dishwasherRatio));
+    const cooksTotal = kitchen.cooks * shifts;
+    const baristasTotal = coffee.baristas * shifts;
+    const waitersTotal = waitersCount * shifts;
+    const dishwashersTotal = dishwashersCount * shifts;
+    const totalStaff = cooksTotal + baristasTotal + waitersTotal + dishwashersTotal;
+    const cooksPayroll = cooksTotal * hall.cookSalary;
+    const baristasPayroll = baristasTotal * hall.baristaSalary;
+    const waitersPayroll = waitersTotal * hall.waiterSalary;
+    const dishwashersPayroll = dishwashersTotal * hall.dishwasherSalary;
+    const totalPayroll = cooksPayroll + baristasPayroll + waitersPayroll + dishwashersPayroll;
+    const totalPayrollWithTaxes = totalPayroll * 1.45;
+
+    // Себестоимость
+    const totalProd = kitchenRev + coffeeRev;
+    const kitchenShare = totalProd > 0 ? kitchenRev / totalProd : 0;
+    const coffeeShare = totalProd > 0 ? coffeeRev / totalProd : 0;
+    const dailyKitchenRev = dailyRevenue * kitchenShare;
+    const dailyCoffeeRev = dailyRevenue * coffeeShare;
+    const foodCostAbsolute = dailyKitchenRev * (hall.foodCostPercent / 100) * 30;
+    const drinkCostAbsolute = dailyCoffeeRev * (hall.drinkCostPercent / 100) * 30;
+    const totalCostOfGoods = foodCostAbsolute + drinkCostAbsolute;
+
+    // Прибыль
+    const monthlyProfit = monthlyRevenue - rentVal - totalPayrollWithTaxes - monthlyHeatingCost - totalCostOfGoods;
+
+    setResults({
+      shiftMin,
+      load,
+      prepR,
+      prepMin,
+      availMin,
+      dishRes,
+      totalDishes,
+      kitchenRev,
+      kitchenLoad,
+      cap,
+      coffeeCap,
+      coffeeRev,
+      drinkTime,
+      baristas,
+      maxGuestsWithoutLoad,
+      maxGuestsPerShift,
+      realisticGuestsPerShift,
+      realisticShiftRevenue,
+      hallRevPerShift,
+      avgCheck,
+      seats,
+      guestTime,
+      turnsPerShift,
+      shiftRevenue,
+      dailyRevenue,
+      monthlyRevenue,
+      bottleneck,
+      shifts,
+      rent: rentVal,
+      normalRent,
+      rentShare,
+      ventHall,
+      ventKit,
+      ventTotal,
+      heatH,
+      heatK,
+      heatTotal,
+      dT,
+      outTemp,
+      inTemp,
+      sf,
+      benchmark: venue.benchmark,
+      venueKey,
+      venueLabel: venue.label,
+      cooks: kitchen.cooks,
+      par: kitchen.parallelism,
+      recommendedHallArea,
+      recommendedKitchenArea,
+      monthlyHeatingCost,
+      electricityPrice: ventilation.electricityPrice,
+      waiterRatio: hall.waiterRatio,
+      dishwasherRatio: hall.dishwasherRatio,
+      operatingHours: common.operatingHours,
+      shiftHours: common.shiftHours,
+      totalPayroll,
+      totalPayrollWithTaxes,
+      totalStaff,
+      monthlyProfit,
+      foodCostAbsolute,
+      drinkCostAbsolute,
+      totalCostOfGoods,
+      foodCostPercent: hall.foodCostPercent,
+      drinkCostPercent: hall.drinkCostPercent,
+    });
+  }, [common, hall, coffee, kitchen, ventilation, recommendedHallArea, recommendedKitchenArea]);
+
+  if (!results) return <div className="p-8 text-center text-gray-400">Загрузка...</div>;
+
+  const openHelp = (block: string) => setHelpModal({ block, open: true });
+  const closeHelp = () => setHelpModal({ block: '', open: false });
+
+  // ---- Вспомогательная функция для округления при выводе ----
+  const fmt = (num: number) => Math.round(num).toLocaleString('ru-RU');
+  const fmtPct = (num: number) => Math.round(num).toFixed(0) + '%';
+
+  // ---- Тексты подсказок ----
+  const helpTexts: Record<string, { title: string; text: string }> = {
+    kpi: {
+      title: 'Ключевые показатели',
+      text: 'Дневная выручка – выручка за все смены (реалистичная). Месячная – дневная × 30. Узкое место – где заканчивается пропускная способность (зал или производство). Доля аренды – аренда / месячная выручка. Прибыль – выручка минус все расходы (аренда, ФОТ+налоги, отопление, себестоимость).',
+    },
+    hall: {
+      title: 'Пропускная способность зала',
+      text: 'Гости за смену = места × оборачиваемость × загрузка. Оборачиваемость зависит от формата (ресторан 1.8, кафе 2.2 и т.д.). Загрузка – общий коэффициент из настроек. Максимальная пропускная способность – при 100% загрузке. Ориентир – средний рынок для данного формата.',
+    },
+    kitchen: {
+      title: 'Производительность кухни',
+      text: 'Доступное время = смена × загрузка − время на заготовки. Количество блюд = доступное время × повара × параллельность / время на блюдо. Загрузка кухни – фактическое использование мощности. Критическая загрузка (>95%) – риск сбоев.',
+    },
+    coffee: {
+      title: 'Производительность кофейни',
+      text: 'Напитков за смену = (доступное время × 60 / время на напиток) × бариста. Выручка = напитки × средняя цена. Это максимальная мощность при текущей загрузке.',
+    },
+    ventilation: {
+      title: 'Вентиляция',
+      text: 'Воздухообмен рассчитывается по площади и нормативу для формата (зал) и типа кухни. Тепловая мощность = воздухообмен × ΔT × 0.335 / 1000 × коэф. запаса. Затраты на отопление – мощность × 720 ч/мес × цена кВт·ч.',
+    },
+    capacity: {
+      title: 'Вместимость по направлениям',
+      text: 'Сравнивается максимальная выручка каждого направления (кухня, кофейня, зал). Узкое место – то, что ограничивает общую выручку. Структура выручки – доля еды и напитков в дневной выручке.',
+    },
+  };
+
+  // ---- Рендер ----
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
-      <h1 className="text-3xl font-bold mb-6">📊 Бизнес-аналитика</h1>
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <header className="mb-8">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center"><TrendingUp className="w-5 h-5 text-blue-600" /></div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Бизнес-аналитика</h1>
+          </div>
+          <p className="text-gray-500 text-sm ml-12">Ресторан / Кафе / Кофейня — расчёт пропускной способности и узких мест</p>
+        </header>
 
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-        <h3 className="font-semibold mb-2">Общие настройки</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium">Длительность смены (ч)</label>
-            <input
-              type="number"
-              min="4"
-              max="12"
-              step="0.5"
-              value={commonSettings.shiftHours}
-              onChange={(e) =>
-                setCommonSettings({ ...commonSettings, shiftHours: Number(e.target.value) })
-              }
-              className="w-full p-2 border rounded"
-            />
+        {/* KPI */}
+        <section className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          {[
+            { label: 'Дневная выручка', value: fmt(results.dailyRevenue), desc: `Ограничение: ${results.bottleneck}` },
+            { label: 'Месячная выручка', value: fmt(results.monthlyRevenue), desc: '×30 дней' },
+            { label: 'Узкое место', value: results.bottleneck, desc: results.bottleneck === 'Зал' ? 'Не хватает мест или обслуживание медленное' : 'Кухня или кофейня не справляются' },
+            { label: 'Доля аренды', value: results.rentShare.toFixed(1) + '%', desc: results.rentShare <= 10 ? 'Отличная аренда' : results.rentShare <= 14 ? 'В пределах нормы' : 'Аренда завышена' },
+            { label: 'Прибыль (мес)', value: fmt(results.monthlyProfit), desc: `ФОТ+налоги: ${fmt(results.totalPayrollWithTaxes)} · Себест.: ${fmt(results.foodCostAbsolute)} / ${fmt(results.drinkCostAbsolute)}` },
+          ].map((item, idx) => (
+            <div key={idx} className={`bg-white border border-gray-200 rounded-2xl p-5 shadow-sm relative ${idx === 2 && results.bottleneck === 'Зал' ? 'border-blue-500' : idx === 2 && results.bottleneck === 'Производство' ? 'border-red-500' : ''}`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">{item.label}</div>
+                  <div className={`text-2xl font-extrabold ${idx === 4 ? (results.monthlyProfit >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-900'}`}>{item.value}</div>
+                  <div className="text-xs text-gray-400 mt-1">{item.desc}</div>
+                </div>
+                <button onClick={() => openHelp('kpi')} className="text-gray-400 hover:text-blue-600 transition">
+                  <Info className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        {/* Настройки и остальные блоки – без изменений, но с кнопками Info */}
+        <div className="mb-12">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2"><Settings className="w-4 h-4" /> Настройки</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
           </div>
-          <div>
-            <label className="block text-sm font-medium">Коэффициент загрузки</label>
-            <input
-              type="range"
-              min="0.5"
-              max="0.95"
-              step="0.05"
-              value={commonSettings.loadFactor}
-              onChange={(e) =>
-                setCommonSettings({ ...commonSettings, loadFactor: Number(e.target.value) })
-              }
-              className="w-full"
-            />
-            <span className="text-sm">{Math.round(commonSettings.loadFactor * 100)}%</span>
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Время на заготовки (фикс. 20%)</label>
-            <div className="text-lg font-semibold">
-              {Math.round(commonSettings.shiftHours * 60 * 0.2)} мин
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {/* Общие настройки */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-gray-700"><Settings className="w-4 h-4 text-blue-600" /> Общие настройки</h3>
+              <div className="space-y-4">
+                <InputField label="Длительность смены (ч)" value={common.shiftHours} onChange={(v) => setCommon({ ...common, shiftHours: v })} min={1} step={0.5} />
+                <InputField label="Часы работы заведения в день" value={common.operatingHours} onChange={(v) => setCommon({ ...common, operatingHours: v })} min={1} step={0.5} description="Для расчёта количества смен и штата" />
+                <SliderWithLabel label="Общая загрузка мощностей" value={common.loadFactor} onChange={(v) => setCommon({ ...common, loadFactor: v })} min={10} max={100} description="Применяется ко всем расчётам (кухня, кофейня, зал)" />
+                <SliderWithLabel label="Доля времени на заготовки" value={common.prepRatio} onChange={(v) => setCommon({ ...common, prepRatio: v })} min={0} max={40} description={`Время на заготовки: ${Math.round(common.shiftHours * 60 * (common.prepRatio / 100))} мин`} />
+              </div>
+            </div>
+
+            {/* Зал */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm md:col-span-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700"><Armchair className="w-4 h-4 text-blue-600" /> Зал</h3>
+                <button onClick={() => openHelp('hall')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <SelectField label="Тип заведения" value={hall.venueType} onChange={(e) => applyVenueDefaults(e)} options={Object.entries(VENUE_TYPES).map(([key, val]) => ({ value: key, label: val.label }))} />
+                  <InputField label="Количество мест" value={hall.seats} onChange={(v) => setHall({ ...hall, seats: v })} min={1} />
+                  <InputField label="Средний чек (₽)" value={hall.avgCheck} onChange={(v) => setHall({ ...hall, avgCheck: v })} min={1} />
+                  <p className="text-[11px] text-gray-400">Загрузка зала определяется общим коэффициентом в настройках</p>
+                </div>
+                <div className="space-y-4">
+                  <InputField label="Площадь зала (м²)" value={hall.hallArea} onChange={(v) => setHall({ ...hall, hallArea: v })} min={1} warning={hallAreaWarning} description={!hallAreaWarning ? `Рекомендуемая площадь: ${recommendedHallArea} м²` : undefined} />
+                  {!hallAreaWarning && <p className="text-[11px] text-gray-400">Минимальная норма: <span className="font-medium">{recommendedHallArea} м²</span> (по СП 118.13330)</p>}
+                  <InputField label="Площадь кухни (м²)" value={hall.kitchenArea} onChange={(v) => setHall({ ...hall, kitchenArea: v })} min={1} warning={kitchenAreaWarning} description={!kitchenAreaWarning ? `Рекомендуемая площадь: ${recommendedKitchenArea} м² (из расчёта 5 м²/повара)` : undefined} />
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Аренда</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <InputField label="Текущая аренда (₽/мес)" value={hall.rent} onChange={(v) => setHall({ ...hall, rent: v })} min={0} />
+                  <div><div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Нормальная аренда (14%)</div><div className="text-lg font-bold text-green-600">{fmt(results.normalRent)} ₽</div></div>
+                  <div><div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Доля аренды</div><div className={`text-lg font-bold ${results.rentShare <= 10 ? 'text-green-600' : results.rentShare <= 14 ? 'text-yellow-600' : 'text-red-600'}`}>{results.rentShare.toFixed(1)}%</div></div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Общая тепловая мощность (с запасом)</div><div className="text-lg font-bold text-blue-600">{results.heatTotal.toFixed(1)} кВт</div></div>
+                  <div><div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Затраты на отопление в месяц</div><div className="text-lg font-bold text-orange-600">{fmt(results.monthlyHeatingCost)} ₽</div><div className="text-[10px] text-gray-400">* Расчёт при работе системы 24/7, 30 дней</div></div>
+                </div>
+              </div>
+              <PayrollBlock
+                cooksCount={kitchen.cooks}
+                cookSalary={hall.cookSalary}
+                baristasCount={coffee.baristas}
+                baristaSalary={hall.baristaSalary}
+                seats={hall.seats}
+                waiterRatio={hall.waiterRatio}
+                waiterSalary={hall.waiterSalary}
+                hallArea={hall.hallArea}
+                dishwasherRatio={hall.dishwasherRatio}
+                dishwasherSalary={hall.dishwasherSalary}
+                operatingHours={common.operatingHours}
+                shiftHours={common.shiftHours}
+              />
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Зарплаты и нормативы</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <InputField label="ЗП повара (₽/мес)" value={hall.cookSalary} onChange={(v) => setHall({ ...hall, cookSalary: v })} min={0} />
+                  <InputField label="ЗП бариста (₽/мес)" value={hall.baristaSalary} onChange={(v) => setHall({ ...hall, baristaSalary: v })} min={0} />
+                  <InputField label="ЗП официанта (₽/мес)" value={hall.waiterSalary} onChange={(v) => setHall({ ...hall, waiterSalary: v })} min={0} />
+                  <InputField label="ЗП мойщицы (₽/мес)" value={hall.dishwasherSalary} onChange={(v) => setHall({ ...hall, dishwasherSalary: v })} min={0} />
+                  <InputField label="Норматив: гостей на 1 официанта" value={hall.waiterRatio} onChange={(v) => setHall({ ...hall, waiterRatio: v })} min={0} description="0 — самообслуживание" />
+                  <InputField label="Норматив: м² на 1 мойщицу" value={hall.dishwasherRatio} onChange={(v) => setHall({ ...hall, dishwasherRatio: v })} min={1} />
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
+                  <InputField label="Себестоимость блюд (%)" value={hall.foodCostPercent} onChange={(v) => setHall({ ...hall, foodCostPercent: v })} min={0} max={100} unit="%" description={`Абс.: ${fmt(results.foodCostAbsolute)} ₽`} />
+                  <InputField label="Себестоимость напитков (%)" value={hall.drinkCostPercent} onChange={(v) => setHall({ ...hall, drinkCostPercent: v })} min={0} max={100} unit="%" description={`Абс.: ${fmt(results.drinkCostAbsolute)} ₽`} />
+                  <div className="col-span-2"><div className="text-xs font-medium text-gray-500">Общая себестоимость</div><div className="text-lg font-bold text-gray-800">{fmt(results.totalCostOfGoods)} ₽</div></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Кофейня */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-gray-700"><Coffee className="w-4 h-4 text-blue-600" /> Кофейня</h3>
+                <button onClick={() => openHelp('coffee')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-4">
+                <InputField label="Количество бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} />
+                <InputField label="Время на 1 напиток (сек)" value={coffee.drinkTime} onChange={(v) => setCoffee({ ...coffee, drinkTime: v })} min={5} />
+                <InputField label="Средняя цена напитка (₽)" value={coffee.drinkPrice} onChange={(v) => setCoffee({ ...coffee, drinkPrice: v })} min={1} />
+              </div>
+            </div>
+
+            {/* Кухня */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm md:col-span-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-gray-700"><Flame className="w-4 h-4 text-blue-600" /> Кухня</h3>
+                <button onClick={() => openHelp('kitchen')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <InputField label="Поваров в смену" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} />
+                <InputField label="Параллельность (блюд/повара)" value={kitchen.parallelism} onChange={(v) => setKitchen({ ...kitchen, parallelism: v })} min={1} description="Сколько блюд одновременно готовит 1 повар" />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-gray-200"><th className="text-left py-2 text-gray-500 font-semibold text-xs uppercase tracking-wider">Название</th><th className="text-left py-2 text-gray-500 font-semibold text-xs uppercase tracking-wider">Время (мин)</th><th className="text-left py-2 text-gray-500 font-semibold text-xs uppercase tracking-wider">Цена (₽)</th><th className="w-10 py-2"></th></tr></thead>
+                  <tbody>
+                    {kitchen.dishes.map((d) => (
+                      <tr key={d.id} className="border-b border-gray-100">
+                        <td className="py-2"><input type="text" value={d.name} onChange={(e) => updateDish(d.id, 'name', e.target.value)} className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-800 text-sm focus:border-blue-600 outline-none" /></td>
+                        <td className="py-2"><input type="number" value={d.time} onChange={(e) => updateDish(d.id, 'time', Number(e.target.value))} className="w-20 bg-white border border-gray-300 rounded px-2 py-1 text-gray-800 text-sm focus:border-blue-600 outline-none" min={1} /></td>
+                        <td className="py-2"><input type="number" value={d.price} onChange={(e) => updateDish(d.id, 'price', Number(e.target.value))} className="w-28 bg-white border border-gray-300 rounded px-2 py-1 text-gray-800 text-sm focus:border-blue-600 outline-none" min={1} /></td>
+                        <td className="py-2 text-center"><button onClick={() => removeDish(d.id)} className="text-red-500 hover:text-red-700 transition" disabled={kitchen.dishes.length <= 1}><X className="w-4 h-4" /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button onClick={addDish} className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800 transition flex items-center gap-1.5"><Plus className="w-3 h-3" /> Добавить категорию</button>
+            </div>
+
+            {/* Вентиляция */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-gray-700"><Wind className="w-4 h-4 text-blue-600" /> Вентиляция</h3>
+                <button onClick={() => openHelp('ventilation')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-4">
+                <SelectField label="Тип кухни" value={ventilation.kitchenType} onChange={(v) => setVentilation({ ...ventilation, kitchenType: v })} options={[{ value: 'hot', label: 'Горячая' }, { value: 'cold', label: 'Холодная' }, { value: 'mixed', label: 'Смешанная' }]} />
+                <SelectField label="Климатическая зона" value={String(ventilation.climateZone)} onChange={(v) => setVentilation({ ...ventilation, climateZone: Number(v) })} options={CLIMATE_ZONES.map((z) => ({ value: String(z.temp), label: `${z.label} (${z.temp}°C)` }))} />
+                <div className="grid grid-cols-2 gap-3">
+                  <InputField label="Желаемая t (°C)" value={ventilation.indoorTemp} onChange={(v) => setVentilation({ ...ventilation, indoorTemp: v })} min={15} max={30} />
+                  <InputField label="Коэфф. запаса" value={ventilation.safetyFactor} onChange={(v) => setVentilation({ ...ventilation, safetyFactor: v })} min={1} max={2} step={0.05} />
+                </div>
+                <div className="pt-2 border-t border-gray-200">
+                  <InputField label="Цена за 1 кВт·ч (₽)" value={ventilation.electricityPrice} onChange={(v) => setVentilation({ ...ventilation, electricityPrice: v })} min={0} step={0.1} unit="₽/кВт·ч" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex space-x-4">
-          {[
-            { key: 'kitchen', label: '🍳 Кухня' },
-            { key: 'coffee', label: '☕ Кофейня' },
-            { key: 'hall', label: '🪑 Зал' },
-            { key: 'ventilation', label: '🌬️ Вентиляция' },
-            { key: 'summary', label: '📈 Сводка' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as typeof activeTab)}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-                activeTab === tab.key
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+        {/* Результаты */}
+        <div className="mb-12">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2"><RefreshCw className="w-4 h-4" /> Результаты</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Кухня */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700"><Flame className="w-4 h-4 text-blue-600" /> Производительность кухни</h3>
+                <button onClick={() => openHelp('kitchen')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Доступно</div><div className="text-lg font-bold mt-1 text-gray-800">{Math.round(results.availMin)} мин</div></div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Блюд</div><div className="text-lg font-bold mt-1 text-gray-800">{results.totalDishes}</div></div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Выручка</div><div className="text-lg font-bold mt-1 text-blue-600">{fmt(results.kitchenRev)} ₽</div></div>
+              </div>
+              <div className="mb-3">
+                <div className="flex justify-between text-[11px] text-gray-500 mb-1"><span>Загрузка</span><span>{Math.round(results.kitchenLoad)}%</span></div>
+                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: Math.min(100, results.kitchenLoad) + '%', background: results.kitchenLoad > 95 ? 'linear-gradient(90deg,#ef4444,#f87171)' : results.kitchenLoad > 80 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#22c55e,#4ade80)' }} /></div>
+                <div className="text-[10px] text-gray-400 mt-1">{results.kitchenLoad > 95 ? 'Критическая загрузка — риск сбоев' : results.kitchenLoad > 80 ? 'Высокая загрузка — запас минимальный' : 'Комфортная загрузка'}</div>
+              </div>
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-gray-200"><th className="text-left py-2 text-gray-500 text-xs uppercase tracking-wider">Категория</th><th className="text-left py-2 text-gray-500 text-xs uppercase tracking-wider">Время</th><th className="text-left py-2 text-gray-500 text-xs uppercase tracking-wider">Цена</th><th className="text-left py-2 text-gray-500 text-xs uppercase tracking-wider">Блюд</th><th className="text-left py-2 text-gray-500 text-xs uppercase tracking-wider">Выручка</th></tr></thead>
+                  <tbody>
+                    {results.dishRes.map((d: any) => (
+                      <tr key={d.id} className="border-b border-gray-100">
+                        <td className="py-2 font-medium text-gray-800">{d.name}</td>
+                        <td className="py-2 text-gray-500">{d.time} мин</td>
+                        <td className="py-2 text-gray-500">{d.price} ₽</td>
+                        <td className="py-2 font-bold text-gray-800">{d.maxDishes}</td>
+                        <td className="py-2 text-blue-600 font-bold">{fmt(d.revenue)} ₽</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr><td colSpan={3} className="py-2 font-bold text-gray-800">Итого</td><td className="py-2 font-bold text-gray-800">{results.totalDishes}</td><td className="py-2 font-bold text-blue-600">{fmt(results.kitchenRev)} ₽</td></tr></tfoot>
+                </table>
+              </div>
+            </div>
 
-      <div className="mt-4">
-        {activeTab === 'kitchen' && (
-          <KitchenTab
-            categories={categories}
-            setCategories={setCategories}
-            cooksCount={cooksCount}
-            setCooksCount={setCooksCount}
-            parallelism={parallelism}
-            setParallelism={setParallelism}
-            commonSettings={commonSettings}
-            kitchenResult={kitchenResult}
-            setKitchenResult={setKitchenResult}
-          />
-        )}
-        {activeTab === 'coffee' && (
-          <CoffeeTab
-            baristasCount={baristasCount}
-            setBaristasCount={setBaristasCount}
-            timePerDrink={timePerDrink}
-            setTimePerDrink={setTimePerDrink}
-            avgDrinkPrice={avgDrinkPrice}
-            setAvgDrinkPrice={setAvgDrinkPrice}
-            coffeeResult={coffeeResult}
-          />
-        )}
-        {activeTab === 'hall' && (
-          <HallTab
-            seats={seats}
-            setSeats={setSeats}
-            avgStayTime={avgStayTime}
-            setAvgStayTime={setAvgStayTime}
-            avgCheck={avgCheck}
-            setAvgCheck={setAvgCheck}
-            hallLoadFactor={hallLoadFactor}
-            setHallLoadFactor={setHallLoadFactor}
-            hallResult={hallResult}
-          />
-        )}
-        {activeTab === 'ventilation' && (
-          <VentilationTab />
-        )}
-        {activeTab === 'summary' && (
-          <SummaryTab summary={summary} />
+            {/* Кофейня */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700"><Coffee className="w-4 h-4 text-blue-600" /> Производительность кофейни</h3>
+                <button onClick={() => openHelp('coffee')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Напитков за смену</div><div className="text-2xl font-extrabold mt-2 text-gray-800">{Math.round(results.coffeeCap).toLocaleString('ru-RU')}</div></div>
+                <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Макс. выручка</div><div className="text-2xl font-extrabold mt-2 text-blue-600">{fmt(results.coffeeRev)} ₽</div></div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-2 border border-gray-100">
+                <div className="flex justify-between"><span className="text-gray-500">Бариста</span><span className="font-bold text-gray-800">{results.baristas}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Время на напиток</span><span className="font-bold text-gray-800">{results.drinkTime} сек</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Напитков в мин.</span><span className="font-bold text-gray-800">{results.baristas > 0 ? (60 / results.drinkTime * results.baristas).toFixed(1) : '0'}</span></div>
+              </div>
+            </div>
+
+            {/* Зал */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700"><Armchair className="w-4 h-4 text-blue-600" /> Пропускная способность зала</h3>
+                <button onClick={() => openHelp('hall')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded">
+                <div><div className="text-sm text-gray-600">Гостей за смену (при тек. загрузке)</div><div className="text-3xl font-bold">{results.realisticGuestsPerShift.toLocaleString('ru-RU')}</div></div>
+                <div><div className="text-sm text-gray-600">Выручка за смену (реалистичная)</div><div className="text-3xl font-bold text-green-700">{fmt(results.shiftRevenue)} ₽</div></div>
+                <div><div className="text-sm text-gray-600">Загрузка зала</div><div className="text-3xl font-bold">{Math.round((results.realisticGuestsPerShift / results.maxGuestsWithoutLoad) * 100)}%</div></div>
+              </div>
+              <div className="mt-3 p-3 bg-gray-50 rounded">
+                <div className="flex justify-between text-sm"><span className="text-gray-600">Максимальная пропускная способность (потолок)</span><span className="font-bold">{results.maxGuestsWithoutLoad.toLocaleString('ru-RU')} гостей</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-600">Максимальная возможная выручка (при 100% загрузке)</span><span className="font-bold text-blue-600">{fmt(results.hallRevPerShift)} ₽</span></div>
+              </div>
+              <div className="mt-4 p-3 bg-gray-50 rounded border border-gray-200">
+                <div className="flex justify-between text-sm"><span className="text-gray-600">Среднее время гостя (норматив)</span><span className="font-bold">{results.guestTime} мин</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-600">Оборачиваемость места (посадок за смену)</span><span className="font-bold">{results.turnsPerShift.toFixed(1)}</span></div>
+              </div>
+              <div className={`mt-4 p-3 rounded border ${results.maxGuestsPerShift >= results.benchmark ? 'text-green-600 border-green-200 bg-green-50' : 'text-red-600 border-red-200 bg-red-50'}`}>
+                <p className="text-sm">{results.maxGuestsPerShift >= results.benchmark ? '✅ В пределах рыночного ориентира' : '⚠️ Ниже рыночного ориентира'}</p>
+                <p className="text-xs text-gray-500 mt-1">Ориентир для «{results.venueLabel}»: <strong>{results.benchmark}</strong> гостей/смена. {results.maxGuestsPerShift >= results.benchmark ? `(+${results.maxGuestsPerShift - results.benchmark})` : `(${results.maxGuestsPerShift - results.benchmark})`}</p>
+              </div>
+            </div>
+
+            {/* Вентиляция */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700"><Wind className="w-4 h-4 text-blue-600" /> Вентиляция</h3>
+                <button onClick={() => openHelp('ventilation')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Зал</div><div className="text-base font-bold mt-1 text-gray-800">{results.ventHall.toLocaleString('ru-RU')} м³/ч</div></div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Кухня</div><div className="text-base font-bold mt-1 text-gray-800">{results.ventKit.toLocaleString('ru-RU')} м³/ч</div></div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-[11px] text-gray-500 uppercase tracking-wider">Итого</div><div className="text-base font-bold mt-1 text-gray-800">{results.ventTotal.toLocaleString('ru-RU')} м³/ч</div></div>
+              </div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Тепловая мощность (нагрев притока)</div>
+              <div className="space-y-2 mb-3">
+                <div className="flex justify-between text-sm"><span className="text-gray-500">Зал</span><span className="text-gray-800">{results.heatH.toFixed(1)} кВт</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-500">Кухня</span><span className="text-gray-800">{results.heatK.toFixed(1)} кВт</span></div>
+                <div className="flex justify-between text-sm font-bold border-t border-gray-200 pt-2"><span className="text-gray-700">Общая (с запасом)</span><span className="text-blue-600">{results.heatTotal.toFixed(1)} кВт</span></div>
+              </div>
+              <div className="text-xs text-gray-400 mb-2">ΔT = {results.inTemp}°C − ({results.outTemp}°C) = {results.dT}°C</div>
+              <div className="flex gap-3 p-3 bg-blue-50 border-l-4 border-blue-500 rounded-lg text-xs text-gray-700 leading-relaxed">
+                <Wind className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                <div>{results.heatTotal < 10 ? 'Электрический калорифер — достаточно для небольшой тепловой мощности.' : results.heatTotal <= 30 ? 'Водяной калорифер (подключение к системе отопления) или тепловой насос — оптимально для средней мощности.' : 'Водяной калорифер (подключение к системе отопления) — обязательно для высокой тепловой мощности.'}</div>
+              </div>
+            </div>
+
+            {/* Вместимость */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm lg:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700"><Gauge className="w-4 h-4 text-blue-600" /> Вместимость по направлениям</h3>
+                <button onClick={() => openHelp('capacity')} className="text-gray-400 hover:text-blue-600 transition"><Info className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { label: 'Кухня', value: results.kitchenRev, color: '#ef4444', icon: Flame },
+                  { label: 'Кофейня', value: results.coffeeRev, color: '#8b5cf6', icon: Coffee },
+                  { label: 'Зал', value: results.hallRevPerShift, color: '#2563eb', icon: Armchair },
+                ].map((item) => {
+                  const max = Math.max(results.kitchenRev, results.coffeeRev, results.hallRevPerShift, 1);
+                  const pct = Math.max(2, (item.value / max) * 100);
+                  const isBottleneck = (item.label === 'Зал' && results.bottleneck === 'Зал') || (item.label !== 'Зал' && results.bottleneck === 'Производство');
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className={`flex items-center gap-2 ${isBottleneck ? 'text-blue-700 font-bold' : 'text-gray-600'}`}>
+                          <Icon className="w-4 h-4" /> {item.label}
+                          {isBottleneck && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">УЗКОЕ МЕСТО</span>}
+                        </span>
+                        <span className="font-bold text-gray-800">{fmt(item.value)} ₽</span>
+                      </div>
+                      <div className="h-9 bg-gray-200 rounded-lg overflow-hidden relative">
+                        <div className="h-full rounded-lg transition-all duration-700 flex items-center px-3 text-xs font-bold text-white" style={{ width: pct + '%', background: item.color, minWidth: pct > 15 ? 'auto' : '0' }}>{pct > 15 && fmt(item.value) + ' ₽'}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Структура дневной выручки</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-sm bg-red-500" /><div><div className="text-sm font-semibold text-gray-800">Еда (кухня)</div><div className="text-xs text-gray-500">{fmt(results.kitchenRev)} ₽ · {results.kitchenRev + results.coffeeRev > 0 ? Math.round((results.kitchenRev / (results.kitchenRev + results.coffeeRev)) * 100) : 0}%</div></div></div>
+                  <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-sm bg-purple-500" /><div><div className="text-sm font-semibold text-gray-800">Напитки (кофейня)</div><div className="text-xs text-gray-500">{fmt(results.coffeeRev)} ₽ · {results.kitchenRev + results.coffeeRev > 0 ? Math.round((results.coffeeRev / (results.kitchenRev + results.coffeeRev)) * 100) : 0}%</div></div></div>
+                  <div className="sm:col-span-2 mt-2 pt-2 border-t border-gray-200"><div className="text-xs text-gray-500">Общая дневная выручка</div><div className="text-lg font-extrabold text-blue-600">{fmt(results.dailyRevenue)} ₽</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Рекомендации – без изменений, но добавим кнопку Info? Можно не добавлять, т.к. рекомендации и так понятны */}
+        <div className="mb-12">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2"><Lightbulb className="w-4 h-4" /> Рекомендации</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+          </div>
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            <div className="space-y-3">
+              {(() => {
+                const recs = [];
+                if (results.bottleneck === 'Зал') {
+                  recs.push({ color: '#2563eb', icon: Armchair, title: 'Зал является узким местом', text: 'Увеличьте количество мест или сократите время пребывания гостей.' });
+                  recs.push({ color: '#2563eb', icon: Users, title: 'Увеличьте посадочные места', text: `Текущие ${results.seats} мест при загрузке ${Math.round(results.load*100)}% дают ${results.realisticGuestsPerShift} гостей. Добавление мест повысит пропускную способность.` });
+                  recs.push({ color: '#2563eb', icon: Clock, title: 'Ускорьте обслуживание', text: 'Меньше времени на приём заказа, предзаказ через QR-код, электронные чеки — всё это сокращает время гостя.' });
+                  recs.push({ color: '#2563eb', icon: TrendingUp, title: 'Дополнительные каналы', text: 'Внедрите предварительную запись, доставку или самовывоз.' });
+                } else {
+                  recs.push({ color: '#dc2626', icon: Flame, title: 'Производство — узкое место', text: `Кухня (${fmt(results.kitchenRev)} ₽) + Кофейня (${fmt(results.coffeeRev)} ₽) = ${fmt(results.kitchenRev + results.coffeeRev)} ₽ — меньше потенциала зала (${fmt(results.hallRevPerShift)} ₽).` });
+                  if (results.kitchenLoad > 90) recs.push({ color: '#dc2626', icon: Users, title: 'Увеличьте количество поваров', text: `Загрузка кухни ${Math.round(results.kitchenLoad)}%. Добавление повара или повышение параллельности снизит нагрузку.` });
+                  recs.push({ color: '#7c3aed', icon: Coffee, title: 'Проверьте кофейню', text: `Максимум ${Math.round(results.coffeeCap).toLocaleString('ru-RU')} напитков за смену. Если поток гостей выше — добавьте бариста или сократите время приготовления.` });
+                  recs.push({ color: '#d97706', icon: Utensils, title: 'Оптимизируйте меню', text: 'Упростите самые медленные блюда или уберите их из основного меню.' });
+                }
+                if (results.kitchenLoad > 95) recs.push({ color: '#dc2626', icon: AlertTriangle, title: 'Критическая загрузка кухни', text: `${Math.round(results.kitchenLoad)}% — высокий риск сбоев. Рассмотрите дополнительные смены или сокращение меню.` });
+                else if (results.kitchenLoad < 50 && results.cooks > 0) recs.push({ color: '#16a34a', icon: TrendingDown, title: 'Кухня недозагружена', text: `${Math.round(results.kitchenLoad)}% загрузки при ${results.cooks} поварах. Можно сократить штат или увеличить ассортимент.` });
+                if (results.rentShare > 14) recs.push({ color: '#dc2626', icon: Building, title: 'Аренда завышена', text: `Доля ${results.rentShare.toFixed(1)}% при норме до 14%. Это ${fmt(results.rent)} ₽/мес при рекомендуемом максимуме ${fmt(results.normalRent)} ₽.` });
+                else if (results.rentShare <= 10 && results.rent > 0) recs.push({ color: '#16a34a', icon: CheckCircle, title: 'Отличная аренда', text: `Доля ${results.rentShare.toFixed(1)}% — значительно ниже рыночной нормы. Сильное конкурентное преимущество.` });
+                return recs.map((r, i) => (
+                  <div key={i} className="flex gap-3 p-3 bg-gray-50 rounded-xl border-l-4" style={{ borderColor: r.color }}>
+                    <r.icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: r.color }} />
+                    <div><div className="text-sm font-bold text-gray-800 mb-0.5">{r.title}</div><div className="text-xs text-gray-500 leading-relaxed">{r.text}</div></div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* Модальное окно подсказки */}
+        {helpModal.open && helpTexts[helpModal.block] && (
+          <HelpModal
+            isOpen={true}
+            onClose={closeHelp}
+            title={helpTexts[helpModal.block].title}
+          >
+            <p>{helpTexts[helpModal.block].text}</p>
+          </HelpModal>
         )}
       </div>
     </div>
