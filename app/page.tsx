@@ -1,6 +1,7 @@
+// app/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePlan } from '../lib/usePlan';
 import {
   Wallet,
@@ -14,11 +15,6 @@ import {
   ChevronDown,
   Edit,
 } from 'lucide-react';
-
-// ---- Вспомогательная функция для форматирования процентов ----
-function formatPercent(value: number): string {
-  return value.toFixed(2);
-}
 
 // ---- Типы ----
 type BusinessData = {
@@ -74,8 +70,11 @@ const defaultBusiness: BusinessData = {
   healthIndex: 62,
 };
 
+// ---- Вспомогательная функция для форматирования процентов ----
+const formatPercent = (value: number): string => value.toFixed(2);
+
 // ---- Пересчёт показателей ----
-function recalcBusiness(data: Partial<BusinessData>): BusinessData {
+const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const revenue = data.revenue ?? defaultBusiness.revenue;
   const rent = data.rent ?? defaultBusiness.rent;
   const utilities = data.utilities ?? defaultBusiness.utilities;
@@ -98,10 +97,11 @@ function recalcBusiness(data: Partial<BusinessData>): BusinessData {
     Math.max(
       0,
       Math.round(
-        (100 - (rentPercent > 14 ? (rentPercent - 14) * 2 : 0) -
+        100 -
+        (rentPercent > 14 ? (rentPercent - 14) * 2 : 0) -
         (payrollPercent > 25 ? (payrollPercent - 25) * 1.5 : 0) -
         (foodCostPercent > 32 ? (foodCostPercent - 32) * 1.2 : 0) +
-        (profitPercent > 10 ? (profitPercent - 10) * 2 : 0))
+        (profitPercent > 10 ? (profitPercent - 10) * 2 : 0)
       )
     )
   );
@@ -126,10 +126,10 @@ function recalcBusiness(data: Partial<BusinessData>): BusinessData {
     profitPercent,
     healthIndex,
   };
-}
+};
 
 // ---- Зоны внимания ----
-function getAttentionZones(data: BusinessData) {
+const getAttentionZones = (data: BusinessData) => {
   const zones = [];
   if (data.rentPercent > 14) {
     zones.push({
@@ -168,14 +168,15 @@ function getAttentionZones(data: BusinessData) {
     });
   }
   return zones;
-}
+};
 
 // ---- Toast ----
-function Toast({ message, type, onClose }: { message: string; type: 'success' | 'info'; onClose: () => void }) {
+const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'info'; onClose: () => void }) => {
   useEffect(() => {
     const timer = setTimeout(onClose, 3000);
     return () => clearTimeout(timer);
   }, [onClose]);
+
   const bgColor = type === 'success' ? 'bg-green-600' : 'bg-blue-600';
   return (
     <div className={`fixed bottom-6 right-6 z-50 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all`}>
@@ -184,10 +185,10 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
       <button onClick={onClose} className="ml-2 text-white/80 hover:text-white">×</button>
     </div>
   );
-}
+};
 
 // ---- HealthGauge ----
-function HealthGauge({ score }: { score: number }) {
+const HealthGauge = ({ score }: { score: number }) => {
   const percent = Math.min(100, score);
   return (
     <div className="flex flex-col items-center">
@@ -216,10 +217,10 @@ function HealthGauge({ score }: { score: number }) {
       </span>
     </div>
   );
-}
+};
 
 // ---- AttentionZoneCard ----
-function AttentionZoneCard({ zone }: { zone: any }) {
+const AttentionZoneCard = ({ zone }: { zone: any }) => {
   const statusColors = {
     critical: 'border-red-200 bg-red-50',
     attention: 'border-yellow-200 bg-yellow-50',
@@ -241,10 +242,10 @@ function AttentionZoneCard({ zone }: { zone: any }) {
       <p className="text-sm text-gray-500 mt-1">Потенциал: {zone.potential}</p>
     </div>
   );
-}
+};
 
 // ---- Аккордеон ----
-function AccordionSection({
+const AccordionSection = ({
   title,
   icon: Icon,
   children,
@@ -254,7 +255,7 @@ function AccordionSection({
   icon: React.ElementType;
   children: React.ReactNode;
   defaultOpen?: boolean;
-}) {
+}) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
     <div className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
@@ -271,10 +272,10 @@ function AccordionSection({
       {isOpen && <div className="p-4 pt-0 border-t border-gray-100">{children}</div>}
     </div>
   );
-}
+};
 
 // ---- Модальное окно ввода данных ----
-function DataModal({
+const DataModal = ({
   isOpen,
   onClose,
   data,
@@ -284,7 +285,7 @@ function DataModal({
   onClose: () => void;
   data: BusinessData;
   onSave: (newData: Partial<BusinessData>) => void;
-}) {
+}) => {
   const [form, setForm] = useState(data);
 
   useEffect(() => {
@@ -325,54 +326,31 @@ function DataModal({
             <input type="text" name="address" value={form.address} onChange={handleTextChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Площадь общая (м²)</label>
-              <input type="number" name="totalArea" value={form.totalArea} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Площадь зала (м²)</label>
-              <input type="number" name="hallArea" value={form.hallArea} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Посадочных мест</label>
-              <input type="number" name="seats" value={form.seats} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Количество сотрудников</label>
-              <input type="number" name="staffCount" value={form.staffCount} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Выручка в месяц (₽)</label>
-              <input type="number" name="revenue" value={form.revenue} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Средний чек (₽)</label>
-              <input type="number" name="avgCheck" value={form.avgCheck} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Аренда (₽)</label>
-              <input type="number" name="rent" value={form.rent} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Коммунальные платежи (₽)</label>
-              <input type="number" name="utilities" value={form.utilities} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">ФОТ (₽)</label>
-              <input type="number" name="payroll" value={form.payroll} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Затраты на управление (₽)</label>
-              <input type="number" name="managementCosts" value={form.managementCosts} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Себестоимость (₽)</label>
-              <input type="number" name="costOfGoods" value={form.costOfGoods} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Прочие расходы (₽)</label>
-              <input type="number" name="otherExpenses" value={form.otherExpenses} onChange={handleChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-            </div>
+            {[
+              { name: 'totalArea', label: 'Площадь общая (м²)' },
+              { name: 'hallArea', label: 'Площадь зала (м²)' },
+              { name: 'seats', label: 'Посадочных мест' },
+              { name: 'staffCount', label: 'Количество сотрудников' },
+              { name: 'revenue', label: 'Выручка в месяц (₽)' },
+              { name: 'avgCheck', label: 'Средний чек (₽)' },
+              { name: 'rent', label: 'Аренда (₽)' },
+              { name: 'utilities', label: 'Коммунальные платежи (₽)' },
+              { name: 'payroll', label: 'ФОТ (₽)' },
+              { name: 'managementCosts', label: 'Затраты на управление (₽)' },
+              { name: 'costOfGoods', label: 'Себестоимость (₽)' },
+              { name: 'otherExpenses', label: 'Прочие расходы (₽)' },
+            ].map((field) => (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700">{field.label}</label>
+                <input
+                  type="number"
+                  name={field.name}
+                  value={form[field.name as keyof BusinessData] as number}
+                  onChange={handleChange}
+                  className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+            ))}
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Отмена</button>
@@ -382,7 +360,7 @@ function DataModal({
       </div>
     </div>
   );
-}
+};
 
 // ---- Главная страница (Dashboard) ----
 export default function Dashboard() {
@@ -393,7 +371,7 @@ export default function Dashboard() {
 
   // Загрузка данных из БД, затем из localStorage
   useEffect(() => {
-    async function loadData() {
+    const loadData = async () => {
       try {
         const res = await fetch('/api/audits/latest');
         if (res.ok) {
@@ -426,7 +404,6 @@ export default function Dashboard() {
           setBusinessData(businessFromDB);
           localStorage.setItem('momentoBusinessData', JSON.stringify(businessFromDB));
         } else {
-          // Если нет аудита, загружаем из localStorage
           const saved = localStorage.getItem('momentoBusinessData');
           if (saved) {
             const parsed = JSON.parse(saved);
@@ -441,7 +418,7 @@ export default function Dashboard() {
           setBusinessData(recalcBusiness(parsed));
         }
       }
-    }
+    };
     loadData();
   }, []);
 
@@ -451,7 +428,6 @@ export default function Dashboard() {
     setBusinessData(updated);
     localStorage.setItem('momentoBusinessData', JSON.stringify(updated));
 
-    // Отправляем в БД
     try {
       const payload = {
         name: updated.name,
@@ -492,9 +468,9 @@ export default function Dashboard() {
 
   const attentionZones = getAttentionZones(businessData);
 
-  const demandSummary = `Точка недополучает дневной спрос: рядом расположены офисы, но предложение для бизнес-ланча не сформировано.`;
+  const demandSummary = 'Точка недополучает дневной спрос: рядом расположены офисы, но предложение для бизнес-ланча не сформировано.';
   const financeSummary = `Доля аренды составляет ${formatPercent(businessData.rentPercent)}% выручки, целевой ориентир — до 14%.`;
-  const operationsSummary = `У 30% блюд нет актуальных ТТК, поэтому сложно контролировать себестоимость.`;
+  const operationsSummary = 'У 30% блюд нет актуальных ТТК, поэтому сложно контролировать себестоимость.';
 
   return (
     <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
