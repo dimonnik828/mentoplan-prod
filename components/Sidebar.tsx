@@ -1,19 +1,37 @@
 'use client';
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  BarChart3,
+  FileText,
+  History,
+  Settings,
+  Wrench,
+} from 'lucide-react';
 
-const menuItems = [
+const navGroups = [
   {
-    title: 'Главная',
-    href: '/',
+    title: 'Основное',
+    items: [
+      { title: 'Дашборд', href: '/', icon: LayoutDashboard },
+      { title: 'Бизнес-аналитика', href: '/business', icon: BarChart3 },
+    ],
   },
   {
-    title: 'Бизнес',
-    href: '/business',
+    title: 'Данные',
+    items: [
+      { title: 'Технологические карты', href: '/ttk', icon: FileText },
+      { title: 'История аудитов', href: '/history', icon: History },
+    ],
   },
   {
-    title: 'ТТК (список)',
-    href: '/ttk',
+    title: 'Система',
+    items: [
+      { title: 'Управление ТТК', href: '/admin/ttk', icon: Settings },
+      { title: 'Диагностика', href: '/diagnostics', icon: Wrench },
+    ],
   },
 ];
 
@@ -21,49 +39,73 @@ export function Sidebar() {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
     return pathname === href || pathname?.startsWith(href + '/');
   };
 
   return (
-    <aside className="w-64 bg-white border-r p-4 flex flex-col h-full">
-      <nav className="flex-1 space-y-2">
-        {menuItems.map((item) => {
-          const isItemActive = isActive(item.href);
-          return (
-            <div key={item.href}>
-              <Link
-                href={item.href}
-                className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isItemActive
-                    ? 'bg-gray-200 text-gray-900'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {item.title}
-              </Link>
-              {item.children && (
-                <div className="ml-4 mt-1 space-y-1">
-                  {item.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        isActive(child.href)
-                          ? 'bg-gray-200 text-gray-900'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {child.title}
-                    </Link>
-                  ))}
-                </div>
-              )}
+    <aside
+      className="fixed left-0 top-0 bottom-0 bg-white border-r flex flex-col z-40"
+      style={{
+        width: 'var(--sidebar-w)',
+        borderColor: 'var(--border)',
+      }}
+    >
+      {/* Логотип */}
+      <div className="px-5 py-5 border-b" style={{ borderColor: 'var(--border)' }}>
+        <Link href="/" className="flex items-center gap-2.5 no-underline">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+            style={{ background: 'var(--primary)' }}
+          >
+            M
+          </div>
+          <div>
+            <div className="text-sm font-bold" style={{ color: 'var(--text)', lineHeight: 1.2 }}>
+              MOMENTO
             </div>
-          );
-        })}
+            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Аудит общепита
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Навигация */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {navGroups.map((group) => (
+          <div key={group.title}>
+            <div className="nav-section-title">{group.title}</div>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`nav-item ${active ? 'active' : ''}`}
+                  >
+                    <item.icon className="nav-icon" />
+                    {item.title}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
-      <div className="border-t pt-4 text-sm text-gray-500">
-        Версия 0.1.0
+
+      {/* Подвал */}
+      <div
+        className="px-5 py-3.5 border-t text-xs"
+        style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+      >
+        <div className="flex items-center justify-between">
+          <span>v0.1.0</span>
+          <span className="badge badge-neutral" style={{ fontSize: 10, padding: '1px 8px' }}>
+            Демо
+          </span>
+        </div>
       </div>
     </aside>
   );
