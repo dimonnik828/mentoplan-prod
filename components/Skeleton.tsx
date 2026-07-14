@@ -1,3 +1,4 @@
+// components/Skeleton.tsx
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
     <div

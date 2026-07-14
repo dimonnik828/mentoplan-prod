@@ -1,0 +1,15 @@
+{"error":{},"level":"error","message":"[API] GET http://localhost:3000/api/ingredients","timestamp":"2026-07-14T11:15:24.966Z"}
+{"error":{},"level":"error","message":"[API] GET http://localhost:3000/api/ingredients","timestamp":"2026-07-14T11:15:25.004Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/ingredients","timestamp":"2026-07-14T12:25:52.223Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/ingredients","timestamp":"2026-07-14T12:25:52.249Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:41:53.870Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:43:25.826Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:26.517Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:27.896Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:29.147Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:30.108Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:30.744Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:31.792Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:32.395Z"}
+{"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:35.413Z"}
+{"error":{"clientVersion":"6.19.3","name":"PrismaClientValidationError"},"level":"error","message":"[API GET] http://localhost:3000/api/admin/analytics/page-metrics","timestamp":"2026-07-14T15:06:54.365Z"}

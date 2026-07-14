@@ -1,4 +1,3 @@
-// app/api/audits/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { PrismaClient } from '@prisma/client';
@@ -9,21 +8,13 @@ export async function GET(request: NextRequest) {
   return apiHandler({
     request,
     handler: async () => {
-      const audits = await prisma.audit.findMany({
+      const clicks = await prisma.analyticsEvent.findMany({
+        where: { type: 'click' },
         orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          address: true,
-          revenue: true,
-          createdAt: true,
-        },
+        take: 20,
+        select: { id: true, page: true, data: true, createdAt: true },
       });
-      return NextResponse.json({ audits });
+      return NextResponse.json(clicks);
     },
   });
-}
-
-export async function POST(request: NextRequest) {
-  // существующий код
 }

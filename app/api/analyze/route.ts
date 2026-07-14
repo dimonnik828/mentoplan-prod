@@ -1,91 +1,51 @@
-// app/api/analyze/route.ts
-import { NextResponse } from 'next/server';
-import { analyzeSchema } from '@/lib/validations';
-import { ZodError } from 'zod';
+// app/api/admin/ttk/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { apiHandler } from '@/lib/api-handler';
+import { ttkCreateSchema } from '@/lib/validations';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function POST(request: Request) {
-  try {
-    // --- Защита Content-Type ---
-    const contentType = request.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      return NextResponse.json(
-        { error: 'Требуется application/json' },
-        { status: 415 }
-      );
-    }
+export async function GET(request: NextRequest) {
+  return apiHandler({
+    request,
+    handler: async () => {
+      const ttks = await prisma.tTK.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+      return NextResponse.json(ttks);
+    },
+  });
+}
 
-    // --- Ограничение размера запроса (2 МБ) ---
-    const contentLength = Number(request.headers.get('content-length') || 0);
-    if (contentLength > 2 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'Тело запроса слишком большое' },
-        { status: 413 }
-      );
-    }
-
-    // --- Парсинг JSON ---
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        { error: 'Некорректный JSON' },
-        { status: 400 }
-      );
-    }
-
-    // --- Валидация с помощью Zod ---
-    const parsed = analyzeSchema.parse(body);
-
-    // --- Сохранение в базу данных (пример) ---
-    const audit = await prisma.audit.create({
-      data: {
-        name: parsed.name || '',
-        address: parsed.address || '',
-        venueType: parsed.venueType || 'cafe',
-        totalArea: parsed.totalArea,
-        hallArea: parsed.hallArea,
-        seats: parsed.seats,
-        staffCount: parsed.staffCount,
-        avgCheck: parsed.avgCheck,
-        revenue: parsed.revenue,
-        rent: parsed.rent,
-        utilities: parsed.utilities,
-        payroll: parsed.payroll,
-        managementCosts: parsed.managementCosts,
-        costOfGoods: parsed.costOfGoods,
-        otherExpenses: parsed.otherExpenses,
-      },
-    });
-
-    // --- Успешный ответ ---
-    return NextResponse.json({
-      success: true,
-      data: audit, // или просто parsed
-    });
-  } catch (error) {
-    // --- Обработка ошибок валидации ---
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        {
-          error: 'Ошибка валидации',
-          details: error.errors.map((e) => ({
-            field: e.path.join('.'),
-            message: e.message,
-          })),
+export async function POST(request: NextRequest) {
+  return apiHandler({
+    request,
+    schema: ttkCreateSchema,
+    handler: async (parsed) => {
+      const ttk = await prisma.tTK.create({
+        data: {
+          name: parsed.name,
+          description: parsed.description || '',
+          price: parsed.price,
+          categoryId: parsed.categoryId ?? null,
         },
-        { status: 400 }
-      );
-    }
+      });
 
-    // --- Ошибка базы данных или другая неожиданная ---
-    console.error('[API analyze]', error);
-    return NextResponse.json(
-      { error: 'Внутренняя ошибка сервера' },
-      { status: 500 }
-    );
-  }
+      if (parsed.ingredients?.length) {
+        // Предполагаем, что модель TTKIngredient существует и связывает TTK с ингредиентами
+        for (const ing of parsed.ingredients) {
+          await prisma.tTKIngredient.create({
+            data: {
+              ttkId: ttk.id,
+              ingredientId: ing.ingredientId,
+              quantity: ing.quantity,
+            },
+          });
+        }
+      }
+
+      return NextResponse.json({ success: true, data: ttk }, { status: 201 });
+    },
+  });
 }
