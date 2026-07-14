@@ -9,6 +9,7 @@ import {
   History,
   Settings,
   Wrench,
+  Megaphone,
 } from 'lucide-react';
 
 const navGroups = [
@@ -17,6 +18,7 @@ const navGroups = [
     items: [
       { title: 'Дашборд', href: '/', icon: LayoutDashboard },
       { title: 'Бизнес-аналитика', href: '/business', icon: BarChart3 },
+      { title: 'Маркетинг', href: '/marketing', icon: Megaphone },
     ],
   },
   {

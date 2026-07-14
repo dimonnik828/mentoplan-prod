@@ -1,25 +1,28 @@
 // app/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlan } from '../lib/usePlan';
 import {
   Wallet,
   Megaphone,
   UsersRound,
-  ArrowRight,
-  PlusCircle,
-  Target,
   CheckCircle,
-  XCircle,
   ChevronDown,
   Edit,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Skeleton, SkeletonCard } from '../components/Skeleton';
 
 // ---- Типы ----
 type BusinessData = {
   name: string;
   address: string;
+  venueType: string;
   totalArea: number;
   hallArea: number;
   seats: number;
@@ -47,6 +50,7 @@ type BusinessData = {
 const defaultBusiness: BusinessData = {
   name: 'Кафе MOMENTO на Тверской',
   address: 'Москва, ул. Тверская, 10',
+  venueType: 'cafe',
   totalArea: 110,
   hallArea: 80,
   seats: 48,
@@ -70,10 +74,9 @@ const defaultBusiness: BusinessData = {
   healthIndex: 62,
 };
 
-// ---- Вспомогательная функция для форматирования процентов ----
 const formatPercent = (value: number): string => value.toFixed(2);
+const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
 
-// ---- Пересчёт показателей ----
 const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const revenue = data.revenue ?? defaultBusiness.revenue;
   const rent = data.rent ?? defaultBusiness.rent;
@@ -109,6 +112,7 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   return {
     ...defaultBusiness,
     ...data,
+    venueType: data.venueType ?? defaultBusiness.venueType,
     revenue,
     rent,
     utilities,
@@ -128,41 +132,32 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   };
 };
 
-// ---- Зоны внимания ----
 const getAttentionZones = (data: BusinessData) => {
-  const zones = [];
+  const zones: { id: string; title: string; status: string; description: string; potential: string }[] = [];
   if (data.rentPercent > 14) {
     zones.push({
-      id: '1',
-      title: 'Аренда выше комфортного уровня',
-      status: 'critical',
+      id: '1', title: 'Аренда выше комфортного уровня', status: 'critical',
       description: `Аренда составляет ${formatPercent(data.rentPercent)}% от выручки, ориентир — до 14%.`,
       potential: `Снизить нагрузку на ${Math.round((data.rentPercent - 14) / 100 * data.revenue)} ₽ в месяц.`,
     });
   }
   if (data.foodCostPercent > 32) {
     zones.push({
-      id: '2',
-      title: 'Высокая себестоимость',
-      status: 'attention',
+      id: '2', title: 'Высокая себестоимость', status: 'attention',
       description: `Food cost составляет ${formatPercent(data.foodCostPercent)}%, целевой уровень — до 32%.`,
       potential: 'Оптимизировать закупки и пересмотреть граммовки популярных блюд.',
     });
   }
   if (data.profitPercent < 12) {
     zones.push({
-      id: '3',
-      title: 'Низкая операционная прибыль',
-      status: 'attention',
+      id: '3', title: 'Низкая операционная прибыль', status: 'attention',
       description: `Прибыль составляет ${formatPercent(data.profitPercent)}% от выручки, потенциал — 15%+.`,
       potential: 'Сократить долю аренды и ФОТ, увеличить дневную выручку.',
     });
   }
   if (zones.length === 0) {
     zones.push({
-      id: '0',
-      title: 'Бизнес в хорошей форме',
-      status: 'opportunity',
+      id: '0', title: 'Бизнес в хорошей форме', status: 'opportunity',
       description: 'Все ключевые показатели в норме.',
       potential: 'Сосредоточьтесь на росте и масштабировании.',
     });
@@ -170,215 +165,215 @@ const getAttentionZones = (data: BusinessData) => {
   return zones;
 };
 
-// ---- Toast ----
 const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'info'; onClose: () => void }) => {
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
   }, [onClose]);
-
-  const bgColor = type === 'success' ? 'bg-green-600' : 'bg-blue-600';
   return (
-    <div className={`fixed bottom-6 right-6 z-50 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all`}>
-      {type === 'success' ? <CheckCircle size={20} /> : <XCircle size={20} />}
-      <span className="text-sm font-medium">{message}</span>
-      <button onClick={onClose} className="ml-2 text-white/80 hover:text-white">×</button>
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium"
+      style={{ background: type === 'success' ? 'var(--success)' : 'var(--primary)' }}>
+      {type === 'success' ? <CheckCircle size={18} /> : <Info size={18} />}
+      <span>{message}</span>
+      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 transition">×</button>
     </div>
   );
 };
 
-// ---- HealthGauge ----
 const HealthGauge = ({ score }: { score: number }) => {
-  const percent = Math.min(100, score);
+  const pct = Math.min(100, Math.max(0, score));
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const color = pct >= 70 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+  const label = pct >= 70 ? 'Хорошо' : pct >= 50 ? 'Зона внимания' : 'Требует действий';
+  const badgeClass = pct >= 70 ? 'badge-success' : pct >= 50 ? 'badge-warning' : 'badge-danger';
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-32 h-32">
-        <svg className="w-32 h-32 -rotate-90">
-          <circle cx="64" cy="64" r="56" fill="none" stroke="#e2e8f0" strokeWidth="12" />
-          <circle
-            cx="64"
-            cy="64"
-            r="56"
-            fill="none"
-            stroke="#2f62d6"
-            strokeWidth="12"
-            strokeDasharray={2 * Math.PI * 56}
-            strokeDashoffset={2 * Math.PI * 56 * (1 - percent / 100)}
-            strokeLinecap="round"
-          />
+      <div className="relative" style={{ width: 120, height: 120 }}>
+        <svg width={120} height={120} className="-rotate-90">
+          <circle cx={60} cy={60} r={r} fill="none" stroke="#f3f4f6" strokeWidth={10} />
+          <circle cx={60} cy={60} r={r} fill="none" stroke={color} strokeWidth={10}
+            strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-gray-900">{score}</span>
-          <span className="text-xs text-gray-500">из 100</span>
+          <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{score}</span>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>из 100</span>
         </div>
       </div>
-      <span className="mt-2 text-sm font-medium text-yellow-700 bg-yellow-50 px-3 py-1 rounded-full">
-        {score >= 70 ? 'Хорошо' : score >= 50 ? 'Зона внимания' : 'Требует действий'}
-      </span>
+      <span className={`badge ${badgeClass} mt-3`}>{label}</span>
     </div>
   );
 };
 
-// ---- AttentionZoneCard ----
-const AttentionZoneCard = ({ zone }: { zone: any }) => {
-  const statusColors = {
-    critical: 'border-red-200 bg-red-50',
-    attention: 'border-yellow-200 bg-yellow-50',
-    opportunity: 'border-green-200 bg-green-50',
+const AttentionZoneCard = ({ zone }: { zone: { id: string; title: string; status: string; description: string; potential: string } }) => {
+  const styles: Record<string, { bg: string; border: string; label: string; labelClass: string }> = {
+    critical: { bg: 'var(--danger-light)', border: 'var(--danger)', label: 'Критично', labelClass: 'badge-danger' },
+    attention: { bg: 'var(--warning-light)', border: 'var(--warning)', label: 'Внимание', labelClass: 'badge-warning' },
+    opportunity: { bg: 'var(--success-light)', border: 'var(--success)', label: 'Хорошо', labelClass: 'badge-success' },
   };
-  const statusText = {
-    critical: 'Критично',
-    attention: 'Внимание',
-    opportunity: 'Возможность',
-  };
+  const s = styles[zone.status] || styles.attention;
   return (
-    <div className={`border-l-4 p-4 rounded-md ${statusColors[zone.status]}`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 uppercase">{statusText[zone.status]}</span>
-        <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">Разобрать</button>
-      </div>
-      <h4 className="font-semibold text-gray-900 mt-1">{zone.title}</h4>
-      <p className="text-sm text-gray-600 mt-1">{zone.description}</p>
-      <p className="text-sm text-gray-500 mt-1">Потенциал: {zone.potential}</p>
+    <div className="card p-4" style={{ borderLeftWidth: 3, borderLeftColor: s.border, background: s.bg }}>
+      <span className={`badge ${s.labelClass} mb-2`}>{s.label}</span>
+      <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>{zone.title}</h4>
+      <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>{zone.description}</p>
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}><span className="font-medium">Потенциал:</span> {zone.potential}</p>
     </div>
   );
 };
 
-// ---- Аккордеон ----
+const CostRow = ({ label, value, target, bold, color }: { label: string; value: number; target?: string; bold?: boolean; color?: string }) => (
+  <div className="flex items-center justify-between py-2">
+    <div className="flex items-center gap-2">
+      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color || 'var(--text-muted)' }} />
+      <span className="text-sm" style={{ color: 'var(--text-secondary)', fontWeight: bold ? 600 : 400 }}>{label}</span>
+    </div>
+    <div className="flex items-center gap-3">
+      <span className="text-sm font-semibold tabular-nums" style={{ color: color || 'var(--text)', fontWeight: bold ? 700 : 600 }}>
+        {formatPercent(value)}%
+      </span>
+      {target && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{target}</span>}
+    </div>
+  </div>
+);
+
 const AccordionSection = ({
-  title,
-  icon: Icon,
-  children,
-  defaultOpen = false,
+  title, icon: Icon, children, defaultOpen = false,
 }: {
-  title: string;
-  icon: React.ElementType;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
+  title: string; icon: React.ElementType; children: React.ReactNode; defaultOpen?: boolean;
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
-    <div className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition"
-      >
+    <div className="card overflow-hidden">
+      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50/50 transition">
         <div className="flex items-center gap-3">
-          <Icon size={20} className="text-gray-600" />
-          <span className="font-semibold text-gray-900">{title}</span>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary-light)' }}>
+            <Icon size={16} style={{ color: 'var(--primary)' }} />
+          </div>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</span>
         </div>
-        <ChevronDown size={20} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={18} style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }} />
       </button>
-      {isOpen && <div className="p-4 pt-0 border-t border-gray-100">{children}</div>}
+      {isOpen && (
+        <div className="px-5 pb-5 pt-0 border-t" style={{ borderColor: 'var(--border-light)' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 };
 
-// ---- Модальное окно ввода данных ----
-const DataModal = ({
-  isOpen,
-  onClose,
-  data,
-  onSave,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  data: BusinessData;
-  onSave: (newData: Partial<BusinessData>) => void;
+const DataModal = ({ isOpen, onClose, data, onSave }: {
+  isOpen: boolean; onClose: () => void; data: BusinessData; onSave: (newData: Partial<BusinessData>) => void;
 }) => {
   const [form, setForm] = useState(data);
-
-  useEffect(() => {
-    setForm(data);
-  }, [data, isOpen]);
+  useEffect(() => { setForm(data); }, [data, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value === '' ? 0 : Number(value) }));
+    setForm(prev => ({ ...prev, [name]: value === '' ? 0 : Number(value) }));
   };
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(form);
-    onClose();
-  };
-
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(form); onClose(); };
   if (!isOpen) return null;
 
+  const fields = [
+    { name: 'totalArea', label: 'Площадь общая (м²)' },
+    { name: 'hallArea', label: 'Площадь зала (м²)' },
+    { name: 'seats', label: 'Посадочных мест' },
+    { name: 'staffCount', label: 'Количество сотрудников' },
+    { name: 'revenue', label: 'Выручка в месяц (₽)' },
+    { name: 'avgCheck', label: 'Средний чек (₽)' },
+    { name: 'rent', label: 'Аренда (₽)' },
+    { name: 'utilities', label: 'Коммунальные платежи (₽)' },
+    { name: 'payroll', label: 'ФОТ (₽)' },
+    { name: 'managementCosts', label: 'Затраты на управление (₽)' },
+    { name: 'costOfGoods', label: 'Себестоимость (₽)' },
+    { name: 'otherExpenses', label: 'Прочие расходы (₽)' },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold">Вводные данные бизнеса</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col" style={{ boxShadow: 'var(--shadow-modal)' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Вводные данные бизнеса</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition" style={{ color: 'var(--text-muted)' }}>✕</button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Название</label>
-            <input type="text" name="name" value={form.name} onChange={handleTextChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Адрес расположения</label>
-            <input type="text" name="address" value={form.address} onChange={handleTextChange} className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { name: 'totalArea', label: 'Площадь общая (м²)' },
-              { name: 'hallArea', label: 'Площадь зала (м²)' },
-              { name: 'seats', label: 'Посадочных мест' },
-              { name: 'staffCount', label: 'Количество сотрудников' },
-              { name: 'revenue', label: 'Выручка в месяц (₽)' },
-              { name: 'avgCheck', label: 'Средний чек (₽)' },
-              { name: 'rent', label: 'Аренда (₽)' },
-              { name: 'utilities', label: 'Коммунальные платежи (₽)' },
-              { name: 'payroll', label: 'ФОТ (₽)' },
-              { name: 'managementCosts', label: 'Затраты на управление (₽)' },
-              { name: 'costOfGoods', label: 'Себестоимость (₽)' },
-              { name: 'otherExpenses', label: 'Прочие расходы (₽)' },
-            ].map((field) => (
-              <div key={field.name}>
-                <label className="block text-sm font-medium text-gray-700">{field.label}</label>
-                <input
-                  type="number"
-                  name={field.name}
-                  value={form[field.name as keyof BusinessData] as number}
-                  onChange={handleChange}
-                  className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                />
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="space-y-5">
+            <div>
+              <label className="section-label block">Основная информация</label>
+              <input type="text" name="name" value={form.name} onChange={handleTextChange} className="input-field mb-3" placeholder="Название" />
+              <input type="text" name="address" value={form.address} onChange={handleTextChange} className="input-field mb-3" placeholder="Адрес" />
+              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Тип заведения</label>
+              <select name="venueType" value={form.venueType} onChange={handleSelectChange} className="input-field">
+                <option value="cafe">Кафе</option>
+                <option value="restaurant">Ресторан</option>
+                <option value="coffee">Кофейня</option>
+                <option value="canteen">Столовая</option>
+                <option value="fastfood">Быстрое обслуживание</option>
+                <option value="darkkitchen">Дарк китчен</option>
+              </select>
+            </div>
+            <div>
+              <label className="section-label block">Площади и ресурсы</label>
+              <div className="grid grid-cols-2 gap-3">
+                {fields.slice(0, 4).map(f => (
+                  <div key={f.name}>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
+                    <input type="number" name={f.name} value={form[f.name as keyof BusinessData] as number} onChange={handleChange} className="input-field" />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Отмена</button>
-            <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">Сохранить</button>
+            </div>
+            <div>
+              <label className="section-label block">Финансы (₽/мес)</label>
+              <div className="grid grid-cols-2 gap-3">
+                {fields.slice(4).map(f => (
+                  <div key={f.name}>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
+                    <input type="number" name={f.name} value={form[f.name as keyof BusinessData] as number} onChange={handleChange} className="input-field" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </form>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
+          <button type="button" onClick={onClose} className="btn-ghost">Отмена</button>
+          <button type="submit" onClick={handleSubmit} className="btn-primary">Сохранить</button>
+        </div>
       </div>
     </div>
   );
 };
 
-// ---- Главная страница (Dashboard) ----
 export default function Dashboard() {
   const [businessData, setBusinessData] = useState<BusinessData>(defaultBusiness);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const { plan, addAction, removeAction } = usePlan();
 
-  // Загрузка данных из БД, затем из localStorage
   useEffect(() => {
     const loadData = async () => {
       try {
         const res = await fetch('/api/audits/latest');
         if (res.ok) {
           const data = await res.json();
-          const businessFromDB: BusinessData = {
+          const b: BusinessData = {
             name: data.name || defaultBusiness.name,
-            address: data.address,
+            address: data.address || '',
+            venueType: data.venueType || 'cafe',
             totalArea: data.totalArea || 0,
             hallArea: data.hallArea || 0,
             seats: data.seats || 0,
@@ -401,37 +396,31 @@ export default function Dashboard() {
             operatingProfit: data.profitAbsolute || 0,
             healthIndex: data.healthIndex || 0,
           };
-          setBusinessData(businessFromDB);
-          localStorage.setItem('momentoBusinessData', JSON.stringify(businessFromDB));
+          setBusinessData(b);
+          localStorage.setItem('momentoBusinessData', JSON.stringify(b));
         } else {
           const saved = localStorage.getItem('momentoBusinessData');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            setBusinessData(recalcBusiness(parsed));
-          }
+          if (saved) setBusinessData(recalcBusiness(JSON.parse(saved)));
         }
-      } catch (error) {
-        console.error('Ошибка загрузки аудита:', error);
+      } catch {
         const saved = localStorage.getItem('momentoBusinessData');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setBusinessData(recalcBusiness(parsed));
-        }
+        if (saved) setBusinessData(recalcBusiness(JSON.parse(saved)));
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
   }, []);
 
-  // Сохранение данных (в localStorage и в БД)
   const saveBusinessData = async (newData: Partial<BusinessData>) => {
     const updated = recalcBusiness(newData);
     setBusinessData(updated);
     localStorage.setItem('momentoBusinessData', JSON.stringify(updated));
-
     try {
       const payload = {
         name: updated.name,
         address: updated.address,
+        venueType: updated.venueType,
         totalArea: updated.totalArea,
         hallArea: updated.hallArea,
         seats: updated.seats,
@@ -450,137 +439,154 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        showToast('Данные сохранены в базу', 'success');
-      } else {
-        showToast('Ошибка сохранения в БД', 'info');
-      }
-    } catch (error) {
-      console.error('Ошибка отправки в БД:', error);
-      showToast('Ошибка соединения', 'info');
+      setToast({ message: res.ok ? 'Данные сохранены' : 'Ошибка сохранения', type: res.ok ? 'success' : 'info' });
+    } catch {
+      setToast({ message: 'Ошибка соединения', type: 'info' });
     }
   };
 
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
-  const closeToast = () => setToast(null);
-
   const attentionZones = getAttentionZones(businessData);
+  const kpis = [
+    { label: 'Выручка/мес', value: `${fmt(businessData.revenue)} ₽`, sub: `Чек: ${fmt(businessData.avgCheck)} ₽`, cls: 'kpi-indigo' as const, icon: TrendingUp },
+    { label: 'Операционная прибыль', value: `${formatPercent(businessData.profitPercent)}%`, sub: `${fmt(businessData.operatingProfit)} ₽`, cls: businessData.profitPercent >= 10 ? 'kpi-emerald' as const : 'kpi-rose' as const, icon: businessData.profitPercent >= 10 ? TrendingUp : TrendingDown },
+    { label: 'Food cost', value: `${formatPercent(businessData.foodCostPercent)}%`, sub: businessData.foodCostPercent > 32 ? 'Выше нормы' : 'В норме', cls: businessData.foodCostPercent > 32 ? 'kpi-amber' as const : 'kpi-emerald' as const, icon: businessData.foodCostPercent > 32 ? AlertTriangle : CheckCircle },
+    { label: 'ФОТ', value: `${formatPercent(businessData.payrollPercent)}%`, sub: businessData.payrollPercent > 25 ? 'Выше нормы' : 'В норме', cls: businessData.payrollPercent > 25 ? 'kpi-amber' as const : 'kpi-emerald' as const, icon: businessData.payrollPercent > 25 ? AlertTriangle : CheckCircle },
+  ];
 
-  const demandSummary = 'Точка недополучает дневной спрос: рядом расположены офисы, но предложение для бизнес-ланча не сформировано.';
-  const financeSummary = `Доля аренды составляет ${formatPercent(businessData.rentPercent)}% выручки, целевой ориентир — до 14%.`;
-  const operationsSummary = 'У 30% блюд нет актуальных ТТК, поэтому сложно контролировать себестоимость.';
-
-  return (
-    <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Верхняя панель */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Картина бизнеса на сегодня</h1>
-            <p className="text-gray-500 mt-1">Мы нашли {attentionZones.length} зон, которые сейчас влияют на прибыль и рост точки.</p>
-          </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition"
-          >
-            <Edit size={18} />
-            Вводные данные
-          </button>
-        </div>
-
-        {/* Индекс здоровья + зоны */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center">
-            <HealthGauge score={businessData.healthIndex} />
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-600">
-                {businessData.healthIndex >= 70
-                  ? 'Бизнес в хорошей форме, но есть потенциал для роста.'
-                  : businessData.healthIndex >= 50
-                  ? 'Есть зоны, требующие внимания. Сосредоточьтесь на ключевых проблемах.'
-                  : 'Необходимо срочно принять меры для улучшения показателей.'}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-4 justify-center">
-                <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-md transition">
-                  Полная диагностика
-                </button>
-                <button className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-4 py-2 rounded-md transition">
-                  План на 30 дней
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {attentionZones.map((zone) => (
-              <AttentionZoneCard key={zone.id} zone={zone} />
+  // Отображение скелетонов при загрузке данных
+  if (loading) {
+    return (
+      <ErrorBoundary>
+        <div className="p-6 lg:p-8" style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <SkeletonCard key={i} />
             ))}
           </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-4">
+              <div className="card p-6 flex flex-col items-center justify-center">
+                <Skeleton className="h-24 w-24 rounded-full" />
+                <Skeleton className="h-4 w-32 mt-4" />
+              </div>
+            </div>
+            <div className="lg:col-span-8 space-y-3">
+              <Skeleton className="h-32 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="p-6 lg:p-8" style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>{businessData.name}</h1>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {businessData.address} · {attentionZones.filter(z => z.status !== 'opportunity').length} зон требуют внимания
+            </p>
+          </div>
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary"><Edit size={16} /> Изменить данные</button>
         </div>
 
-        {/* Финансовая картина */}
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <h3 className="font-semibold text-gray-900">На что уходит выручка</h3>
-          <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
-            <div><span className="font-medium">Себестоимость:</span> {formatPercent(businessData.foodCostPercent)}%</div>
-            <div><span className="font-medium">ФОТ:</span> {formatPercent(businessData.payrollPercent)}%</div>
-            <div><span className="font-medium">Аренда:</span> {formatPercent(businessData.rentPercent)}%</div>
-            <div><span className="font-medium">Коммунальные:</span> {formatPercent(businessData.utilitiesPercent)}%</div>
-            <div><span className="font-medium">Управление:</span> {formatPercent(businessData.managementPercent)}%</div>
-            <div><span className="font-medium">Прочие:</span> {formatPercent(businessData.otherPercent)}%</div>
-            <div className="text-green-600 col-span-2"><span className="font-medium">Прибыль:</span> {formatPercent(businessData.profitPercent)}%</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {kpis.map(kpi => (
+            <div key={kpi.label} className={`kpi-card ${kpi.cls}`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{kpi.label}</span>
+                <kpi.icon size={16} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+              </div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{kpi.value}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{kpi.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+          <div className="lg:col-span-4 card p-6 flex flex-col items-center justify-center">
+            <div className="section-label text-center w-full">Индекс здоровья</div>
+            <HealthGauge score={businessData.healthIndex} />
+            <p className="text-xs text-center mt-4" style={{ color: 'var(--text-secondary)', maxWidth: 200 }}>
+              {businessData.healthIndex >= 70 ? 'Бизнес в хорошей форме, но есть потенциал для роста.' :
+               businessData.healthIndex >= 50 ? 'Есть зоны, требующие внимания. Сосредоточьтесь на ключевых проблемах.' :
+               'Необходимо срочно принять меры для улучшения показателей.'}
+            </p>
+            <div className="flex flex-wrap gap-2 mt-4 justify-center">
+              <button className="btn-primary" style={{ padding: '7px 14px', fontSize: 12 }}>Полная диагностика</button>
+              <button className="btn-ghost" style={{ padding: '7px 14px', fontSize: 12 }}>План на 30 дней</button>
+            </div>
           </div>
-          <p className="mt-2 text-sm text-gray-600">
+          <div className="lg:col-span-8">
+            <div className="section-label">Зоны внимания</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {attentionZones.map(zone => <AttentionZoneCard key={zone.id} zone={zone} />)}
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-5 mb-6">
+          <div className="section-label">На что уходит выручка</div>
+          <CostRow label="Себестоимость" value={businessData.foodCostPercent} target="→ 28–32%" color={businessData.foodCostPercent > 32 ? 'var(--warning)' : 'var(--success)'} />
+          <CostRow label="ФОТ" value={businessData.payrollPercent} target="→ 22–25%" color={businessData.payrollPercent > 25 ? 'var(--warning)' : 'var(--success)'} />
+          <CostRow label="Аренда" value={businessData.rentPercent} target="→ до 14%" color={businessData.rentPercent > 14 ? 'var(--danger)' : 'var(--success)'} />
+          <CostRow label="Коммунальные" value={businessData.utilitiesPercent} color="#8b5cf6" />
+          <CostRow label="Управление" value={businessData.managementPercent} color="#8b5cf6" />
+          <CostRow label="Прочие" value={businessData.otherPercent} color="#8b5cf6" />
+          <div className="divider" />
+          <CostRow label="Операционная прибыль" value={businessData.profitPercent} target="→ 15%+" bold color={businessData.profitPercent >= 10 ? 'var(--success)' : 'var(--danger)'} />
+          <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
             Главное ограничение прибыли — сочетание высокой аренды ({formatPercent(businessData.rentPercent)}%) и затрат на персонал ({formatPercent(businessData.payrollPercent)}%).
           </p>
         </div>
 
-        {/* Аккордеон */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <AccordionSection title="Маркетинг и спрос" icon={Megaphone} defaultOpen>
-            <p className="text-sm text-gray-600">{demandSummary}</p>
-            <div className="mt-2 bg-gray-50 p-3 rounded-md text-sm">
-              <p className="font-medium">Ключевые метрики:</p>
-              <ul className="list-disc list-inside text-gray-600 mt-1">
-                <li>Средний чек: {businessData.avgCheck} ₽</li>
-                <li>Выручка: {businessData.revenue.toLocaleString('ru-RU')} ₽/мес</li>
-                <li>Потенциал роста дневной выручки: +8–12%</li>
-              </ul>
+            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Точка недополучает дневной спрос: рядом расположены офисы, но предложение для бизнес-ланча не сформировано.</p>
+            <div className="rounded-lg p-4" style={{ background: 'var(--border-light)' }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text)' }}>Ключевые метрики:</div>
+              <div className="space-y-1.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                <div className="flex justify-between"><span>Средний чек</span><span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(businessData.avgCheck)} ₽</span></div>
+                <div className="flex justify-between"><span>Выручка</span><span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(businessData.revenue)} ₽/мес</span></div>
+                <div className="flex justify-between"><span>Потенциал роста</span><span className="font-semibold" style={{ color: 'var(--success)' }}>+8–12%</span></div>
+              </div>
             </div>
           </AccordionSection>
+
           <AccordionSection title="Финансы" icon={Wallet} defaultOpen>
-            <p className="text-sm text-gray-600">{financeSummary}</p>
-            <div className="mt-2 bg-gray-50 p-3 rounded-md text-sm">
-              <div className="flex justify-between"><span>Food cost</span><span>{formatPercent(businessData.foodCostPercent)}% (ориентир 28–32%)</span></div>
-              <div className="flex justify-between"><span>ФОТ</span><span>{formatPercent(businessData.payrollPercent)}% (ориентир 22–25%)</span></div>
-              <div className="flex justify-between"><span>Аренда</span><span>{formatPercent(businessData.rentPercent)}% (ориентир до 14%)</span></div>
-              <div className="flex justify-between font-medium text-green-600"><span>Операционная прибыль</span><span>{formatPercent(businessData.profitPercent)}% (ориентир 15%+)</span></div>
+            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Доля аренды составляет {formatPercent(businessData.rentPercent)}% выручки, целевой ориентир — до 14%.</p>
+            <div className="rounded-lg p-4" style={{ background: 'var(--border-light)' }}>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span style={{ color: 'var(--text-secondary)' }}>Food cost</span><span className="font-medium" style={{ color: 'var(--text)' }}>{formatPercent(businessData.foodCostPercent)}% <span style={{ color: 'var(--text-muted)' }}>(→ 28–32%)</span></span></div>
+                <div className="flex justify-between"><span style={{ color: 'var(--text-secondary)' }}>ФОТ</span><span className="font-medium" style={{ color: 'var(--text)' }}>{formatPercent(businessData.payrollPercent)}% <span style={{ color: 'var(--text-muted)' }}>(→ 22–25%)</span></span></div>
+                <div className="flex justify-between"><span style={{ color: 'var(--text-secondary)' }}>Аренда</span><span className="font-medium" style={{ color: 'var(--text)' }}>{formatPercent(businessData.rentPercent)}% <span style={{ color: 'var(--text-muted)' }}>(→ до 14%)</span></span></div>
+                <div className="divider" style={{ margin: '8px 0' }} />
+                <div className="flex justify-between"><span className="font-semibold" style={{ color: 'var(--text)' }}>Операционная прибыль</span><span className="font-bold" style={{ color: 'var(--success)' }}>{formatPercent(businessData.profitPercent)}% <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(→ 15%+)</span></span></div>
+              </div>
             </div>
           </AccordionSection>
+
           <AccordionSection title="Операции и команда" icon={UsersRound} defaultOpen>
-            <p className="text-sm text-gray-600">{operationsSummary}</p>
-            <div className="mt-2 bg-gray-50 p-3 rounded-md text-sm">
-              <ul className="list-disc list-inside text-gray-600">
-                <li>30% блюд без актуальных ТТК</li>
-                <li>Расписание смен не привязано к спросу</li>
-                <li>Текучесть персонала: 18% за квартал</li>
+            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>У 30% блюд нет актуальных ТТК, поэтому сложно контролировать себестоимость.</p>
+            <div className="rounded-lg p-4" style={{ background: 'var(--border-light)' }}>
+              <ul className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)', listStyle: 'none', padding: 0, margin: 0 }}>
+                {['30% блюд без актуальных ТТК', 'Расписание смен не привязано к спросу', 'Текучесть персонала: 18% за квартал'].map(item => (
+                  <li key={item} className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--warning)' }} />
+                    {item}
+                  </li>
+                ))}
               </ul>
             </div>
           </AccordionSection>
         </div>
+
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        <DataModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={businessData} onSave={saveBusinessData} />
       </div>
-
-      {/* Toast */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
-
-      {/* Модалка */}
-      <DataModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        data={businessData}
-        onSave={saveBusinessData}
-      />
-    </main>
+    </ErrorBoundary>
   );
 }

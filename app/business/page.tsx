@@ -1,3 +1,4 @@
+// app/business/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,6 +8,8 @@ import {
   CheckCircle, Users, Utensils, Clock, DollarSign, Info, ChefHat,
   Zap,
 } from 'lucide-react';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { Skeleton, SkeletonCard } from '../../components/Skeleton';
 
 /* ============================================================
    ТИПЫ
@@ -240,6 +243,49 @@ export default function BusinessPage() {
     setDishwashersCount(venue.dishwasherRatio > 0 ? Math.max(1, Math.ceil(hall.hallArea / venue.dishwasherRatio)) : 0);
   };
 
+  // Синхронизация с профилем из дашборда (улучшенная версия)
+  useEffect(() => {
+    const saved = localStorage.getItem('momentoBusinessData');
+    if (!saved) return;
+    try {
+      const b = JSON.parse(saved);
+      const venue = VENUE_TYPES[b.venueType] || VENUE_TYPES.cafe;
+      const seats = b.seats || hall.seats;
+      const hallArea = b.hallArea || hall.hallArea;
+
+      // Рассчитываем персонал на основе свежих данных
+      const newWaiters = venue.hasHall && venue.waiterRatio > 0
+        ? Math.max(1, Math.ceil(seats / venue.waiterRatio))
+        : 0;
+      const newDishwashers = venue.dishwasherRatio > 0
+        ? Math.max(1, Math.ceil(hallArea / venue.dishwasherRatio))
+        : 0;
+
+      setHall(prev => ({
+        ...prev,
+        venueType: b.venueType || prev.venueType,
+        seats,
+        avgCheck: b.avgCheck || prev.avgCheck,
+        hallArea,
+        kitchenArea: b.totalArea && b.hallArea
+          ? Math.max(1, b.totalArea - b.hallArea)
+          : prev.kitchenArea,
+        totalArea: b.totalArea || prev.totalArea,
+        rentPerSqm: b.totalArea > 0
+          ? Math.round(b.rent / b.totalArea)
+          : prev.rentPerSqm,
+        foodCostPercent: b.foodCostPercent || prev.foodCostPercent,
+        waiterRatio: venue.waiterRatio,
+        dishwasherRatio: venue.dishwasherRatio,
+      }));
+
+      setWaitersCount(newWaiters);
+      setDishwashersCount(newDishwashers);
+    } catch (e) {
+      console.error('Ошибка загрузки профиля:', e);
+    }
+  }, []);
+
   const areaPerCook = KITCHEN_AREA_PER_COOK[ventilation.kitchenType]?.typical ?? 7;
   const recommendedKitchenArea = Math.round(kitchen.cooks * areaPerCook);
   const kitchenAreaWarning = hall.kitchenArea < recommendedKitchenArea
@@ -368,309 +414,334 @@ export default function BusinessPage() {
     ventilation: { title: 'Вентиляция', text: 'Воздухообмен = площадь × норматив. Тепловая мощность = воздухообмен × ΔT × 0.335 / 1000 × запас. Затраты = мощность × 720 ч × цена кВт·ч.' },
   };
 
-  if (!results) return <div className="p-8 text-center" style={{ color: 'var(--text-muted)' }}>Расчёт...</div>;
+  if (!results) {
+    return (
+      <ErrorBoundary>
+        <div className="p-6 lg:p-8" style={{ maxWidth: 1400, margin: '0 auto' }}>
+          {/* Скелетоны KPI */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+            {[...Array(5)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+          {/* Скелетоны двух колонок */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-5 space-y-4">
+              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-48 rounded-xl" />
+            </div>
+            <div className="lg:col-span-7 space-y-4">
+              <Skeleton className="h-40 rounded-xl" />
+              <Skeleton className="h-32 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   const isProfit = results.monthlyProfit > 0;
   const isRentOk = results.rentShare <= 14;
 
   return (
-    <div className="p-6 lg:p-8" style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* Шапка */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary-light)' }}>
-          <TrendingUp size={18} style={{ color: 'var(--primary)' }} />
+    <ErrorBoundary>
+      <div className="p-6 lg:p-8" style={{ maxWidth: 1400, margin: '0 auto' }}>
+        {/* Шапка */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary-light)' }}>
+            <TrendingUp size={18} style={{ color: 'var(--primary)' }} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Бизнес-аналитика</h1>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Расчёт пропускной способности, ФОТ, аренды, вентиляции</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Бизнес-аналитика</h1>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Расчёт пропускной способности, ФОТ, аренды, вентиляции</p>
-        </div>
-      </div>
 
-      {/* KPI сверху */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-        <div className="kpi-card kpi-indigo">
-          <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Дневная выручка</div>
-          <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{f(results.dailyRevenue)} ₽</div>
+        {/* KPI сверху */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+          <div className="kpi-card kpi-indigo">
+            <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Дневная выручка</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{f(results.dailyRevenue)} ₽</div>
+          </div>
+          <div className="kpi-card kpi-indigo">
+            <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Месячная выручка</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{f(results.monthlyRevenue)} ₽</div>
+          </div>
+          <div className={`kpi-card ${isProfit ? 'kpi-emerald' : 'kpi-rose'}`}>
+            <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Прибыль/мес</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{f(results.monthlyProfit)} ₽</div>
+          </div>
+          <div className={`kpi-card ${isRentOk ? 'kpi-emerald' : 'kpi-amber'}`}>
+            <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Аренда</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{results.rentShare.toFixed(1)}%</div>
+            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{f(results.rent)} ₽</div>
+          </div>
+          <div className="kpi-card kpi-amber">
+            <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Узкое место</div>
+            <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>{results.bottleneck}</div>
+          </div>
         </div>
-        <div className="kpi-card kpi-indigo">
-          <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Месячная выручка</div>
-          <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{f(results.monthlyRevenue)} ₽</div>
-        </div>
-        <div className={`kpi-card ${isProfit ? 'kpi-emerald' : 'kpi-rose'}`}>
-          <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Прибыль/мес</div>
-          <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{f(results.monthlyProfit)} ₽</div>
-        </div>
-        <div className={`kpi-card ${isRentOk ? 'kpi-emerald' : 'kpi-amber'}`}>
-          <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Аренда</div>
-          <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{results.rentShare.toFixed(1)}%</div>
-          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{f(results.rent)} ₽</div>
-        </div>
-        <div className="kpi-card kpi-amber">
-          <div className="text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Узкое место</div>
-          <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>{results.bottleneck}</div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* ===== ЛЕВАЯ КОЛОНКА: НАСТРОЙКИ ===== */}
-        <div className="lg:col-span-5 space-y-4" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingRight: 4 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* ===== ЛЕВАЯ КОЛОНКА: НАСТРОЙКИ ===== */}
+          <div className="lg:col-span-5 space-y-4" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingRight: 4 }}>
 
-          <SectionCard icon={Building} title="Тип заведения">
-            <SelectField label="Формат" value={hall.venueType} onChange={applyVenueDefaults}
-              options={Object.entries(VENUE_TYPES).map(([k, v]) => ({ value: k, label: v.label }))} />
-          </SectionCard>
-
-          <SectionCard icon={Gauge} title="Площади и аренда">
-            <SliderField label="Общая площадь" value={hall.totalArea} onChange={(v) => setHall({ ...hall, totalArea: v })} min={10} max={2000} unit="м²" />
-            {hasHall && (
-              <SliderField label="Площадь зала" value={hall.hallArea} onChange={(v) => setHall({ ...hall, hallArea: v })} min={1} max={hall.totalArea} unit="м²"
-                hint={results.recommendedHallArea ? `Рекомендуется: ${results.recommendedHallArea} м²` : undefined}
-                warning={hallAreaWarning || areaOverflowWarning} />
-            )}
-            <SliderField label="Площадь кухни" value={hall.kitchenArea} onChange={(v) => setHall({ ...hall, kitchenArea: v })} min={1} max={hall.totalArea} unit="м²"
-              hint={`${results.areaPerCook} м²/повара → ${results.recommendedKitchenArea} м²`}
-              warning={kitchenAreaWarning} />
-            <SliderField label="Аренда" value={hall.rentPerSqm} onChange={(v) => setHall({ ...hall, rentPerSqm: v })} min={0} max={20000} step={50} unit="₽/м²"
-              hint={`Итого: ${f(totalRent)} ₽/мес`} />
-          </SectionCard>
-
-          {hasHall && (
-            <SectionCard icon={Armchair} title="Зал" helpKey="hall" onHelp={openHelp}>
-              <SliderField label="Мест" value={hall.seats} onChange={(v) => setHall({ ...hall, seats: v })} min={1} max={500} />
-              <SliderField label="Средний чек" value={hall.avgCheck} onChange={(v) => setHall({ ...hall, avgCheck: v })} min={50} max={5000} step={50} unit="₽" />
+            <SectionCard icon={Building} title="Тип заведения">
+              <SelectField label="Формат" value={hall.venueType} onChange={applyVenueDefaults}
+                options={Object.entries(VENUE_TYPES).map(([k, v]) => ({ value: k, label: v.label }))} />
             </SectionCard>
-          )}
 
-          <SectionCard icon={Clock} title="Режим работы">
-            <SliderField label="Часов в день" value={common.operatingHours} onChange={(v) => setCommon({ ...common, operatingHours: v })} min={1} max={24} step={0.5} unit="ч" />
-            <SliderField label="Смена" value={common.shiftHours} onChange={(v) => setCommon({ ...common, shiftHours: v })} min={1} max={12} step={0.5} unit="ч"
-              hint={`${results.shifts} смен(ы)`} />
-          </SectionCard>
-
-          <SectionCard icon={Settings} title="Загрузка и спрос">
-            <SliderField label="Загрузка" value={common.loadFactor} onChange={(v) => setCommon({ ...common, loadFactor: v })} min={10} max={100} unit="%" />
-            <SliderField label="Заготовки" value={common.prepRatio} onChange={(v) => setCommon({ ...common, prepRatio: v })} min={0} max={40} unit="%" />
-            <SliderField label="Блюд на гостя" value={common.avgDishesPerGuest} onChange={(v) => setCommon({ ...common, avgDishesPerGuest: v })} min={0.1} max={3} step={0.1} />
-            <SliderField label="Напитков на гостя" value={common.avgDrinksPerGuest} onChange={(v) => setCommon({ ...common, avgDrinksPerGuest: v })} min={0.1} max={3} step={0.1} />
-          </SectionCard>
-
-          <SectionCard icon={Users} title="Персонал">
-            <div className="grid grid-cols-2 gap-x-4">
-              <SliderField label="Поваров" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} max={20} />
-              <SliderField label="ЗП повара" value={hall.cookSalary} onChange={(v) => setHall({ ...hall, cookSalary: v })} min={0} max={200000} step={1000} unit="₽" />
-              <SliderField label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} max={10} />
-              <SliderField label="ЗП бариста" value={hall.baristaSalary} onChange={(v) => setHall({ ...hall, baristaSalary: v })} min={0} max={150000} step={1000} unit="₽" />
+            <SectionCard icon={Gauge} title="Площади и аренда">
+              <SliderField label="Общая площадь" value={hall.totalArea} onChange={(v) => setHall({ ...hall, totalArea: v })} min={10} max={2000} unit="м²" />
               {hasHall && (
+                <SliderField label="Площадь зала" value={hall.hallArea} onChange={(v) => setHall({ ...hall, hallArea: v })} min={1} max={hall.totalArea} unit="м²"
+                  hint={results.recommendedHallArea ? `Рекомендуется: ${results.recommendedHallArea} м²` : undefined}
+                  warning={hallAreaWarning || areaOverflowWarning} />
+              )}
+              <SliderField label="Площадь кухни" value={hall.kitchenArea} onChange={(v) => setHall({ ...hall, kitchenArea: v })} min={1} max={hall.totalArea} unit="м²"
+                hint={`${results.areaPerCook} м²/повара → ${results.recommendedKitchenArea} м²`}
+                warning={kitchenAreaWarning} />
+              <SliderField label="Аренда" value={hall.rentPerSqm} onChange={(v) => setHall({ ...hall, rentPerSqm: v })} min={0} max={20000} step={50} unit="₽/м²"
+                hint={`Итого: ${f(totalRent)} ₽/мес`} />
+            </SectionCard>
+
+            {hasHall && (
+              <SectionCard icon={Armchair} title="Зал" helpKey="hall" onHelp={openHelp}>
+                <SliderField label="Мест" value={hall.seats} onChange={(v) => setHall({ ...hall, seats: v })} min={1} max={500} />
+                <SliderField label="Средний чек" value={hall.avgCheck} onChange={(v) => setHall({ ...hall, avgCheck: v })} min={50} max={5000} step={50} unit="₽" />
+              </SectionCard>
+            )}
+
+            <SectionCard icon={Clock} title="Режим работы">
+              <SliderField label="Часов в день" value={common.operatingHours} onChange={(v) => setCommon({ ...common, operatingHours: v })} min={1} max={24} step={0.5} unit="ч" />
+              <SliderField label="Смена" value={common.shiftHours} onChange={(v) => setCommon({ ...common, shiftHours: v })} min={1} max={12} step={0.5} unit="ч"
+                hint={`${results.shifts} смен(ы)`} />
+            </SectionCard>
+
+            <SectionCard icon={Settings} title="Загрузка и спрос">
+              <SliderField label="Загрузка" value={common.loadFactor} onChange={(v) => setCommon({ ...common, loadFactor: v })} min={10} max={100} unit="%" />
+              <SliderField label="Заготовки" value={common.prepRatio} onChange={(v) => setCommon({ ...common, prepRatio: v })} min={0} max={40} unit="%" />
+              <SliderField label="Блюд на гостя" value={common.avgDishesPerGuest} onChange={(v) => setCommon({ ...common, avgDishesPerGuest: v })} min={0.1} max={3} step={0.1} />
+              <SliderField label="Напитков на гостя" value={common.avgDrinksPerGuest} onChange={(v) => setCommon({ ...common, avgDrinksPerGuest: v })} min={0.1} max={3} step={0.1} />
+            </SectionCard>
+
+            <SectionCard icon={Users} title="Персонал">
+              <div className="grid grid-cols-2 gap-x-4">
+                <SliderField label="Поваров" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} max={20} />
+                <SliderField label="ЗП повара" value={hall.cookSalary} onChange={(v) => setHall({ ...hall, cookSalary: v })} min={0} max={200000} step={1000} unit="₽" />
+                <SliderField label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} max={10} />
+                <SliderField label="ЗП бариста" value={hall.baristaSalary} onChange={(v) => setHall({ ...hall, baristaSalary: v })} min={0} max={150000} step={1000} unit="₽" />
+                {hasHall && (
+                  <>
+                    <SliderField label="Официанты" value={waitersCount} onChange={(v) => setWaitersCount(v)} min={0} max={20}
+                      hint={waitersCount > 0 ? `${Math.ceil(hall.seats / waitersCount)} гост/оф.` : ''} />
+                    <SliderField label="ЗП официанта" value={hall.waiterSalary} onChange={(v) => setHall({ ...hall, waiterSalary: v })} min={0} max={100000} step={1000} unit="₽" />
+                  </>
+                )}
+                <SliderField label="Мойщицы" value={dishwashersCount} onChange={(v) => setDishwashersCount(v)} min={0} max={10}
+                  hint={dishwashersCount > 0 ? `${Math.ceil(hall.hallArea / dishwashersCount)} м²/чел.` : ''} />
+                <SliderField label="ЗП мойщицы" value={hall.dishwasherSalary} onChange={(v) => setHall({ ...hall, dishwasherSalary: v })} min={0} max={100000} step={1000} unit="₽" />
+              </div>
+            </SectionCard>
+
+            <SectionCard icon={DollarSign} title="Себестоимость">
+              <SliderField label="Блюд" value={hall.foodCostPercent} onChange={(v) => setHall({ ...hall, foodCostPercent: v })} min={0} max={100} unit="%"
+                hint={`${f(results.foodCostAbs)} ₽`} />
+              <SliderField label="Напитков" value={hall.drinkCostPercent} onChange={(v) => setHall({ ...hall, drinkCostPercent: v })} min={0} max={100} unit="%"
+                hint={`${f(results.drinkCostAbs)} ₽`} />
+              <ResultRow label="Итого себестоимость" value={`${f(results.totalCOGS)} ₽`} bold />
+            </SectionCard>
+
+            <SectionCard icon={Flame} title="Кухня (меню)" helpKey="kitchen" onHelp={openHelp}>
+              <SliderField label="Поваров" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} max={20} />
+              <SliderField label="Параллельность" value={kitchen.parallelism} onChange={(v) => setKitchen({ ...kitchen, parallelism: v })} min={1} max={10} />
+              <div className="mt-3 space-y-2">
+                {kitchen.dishes.map((d) => (
+                  <div key={d.id} className="flex items-center gap-2">
+                    <input type="text" value={d.name} onChange={(e) => updateDish(d.id, 'name', e.target.value)}
+                      className="input-field flex-1" style={{ padding: '5px 8px', fontSize: 12 }} />
+                    <input type="number" value={d.time} onChange={(e) => updateDish(d.id, 'time', Number(e.target.value))}
+                      className="input-field" style={{ width: 56, padding: '5px 6px', fontSize: 12 }} placeholder="мин" />
+                    <input type="number" value={d.price} onChange={(e) => updateDish(d.id, 'price', Number(e.target.value))}
+                      className="input-field" style={{ width: 72, padding: '5px 6px', fontSize: 12 }} placeholder="₽" />
+                    <button onClick={() => removeDish(d.id)} className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 transition"
+                      style={{ color: 'var(--danger)', fontSize: 14 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={addDish} className="flex items-center gap-1.5 text-xs font-medium mt-2 transition" style={{ color: 'var(--primary)' }}>
+                  <Plus size={14} /> Добавить категорию
+                </button>
+              </div>
+            </SectionCard>
+
+            <SectionCard icon={Coffee} title="Кофейня" helpKey="coffee" onHelp={openHelp}>
+              <SliderField label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} max={10} />
+              <SliderField label="Время напитка" value={coffee.drinkTime} onChange={(v) => setCoffee({ ...coffee, drinkTime: v })} min={10} max={300} unit="сек" />
+              <SliderField label="Цена напитка" value={coffee.drinkPrice} onChange={(v) => setCoffee({ ...coffee, drinkPrice: v })} min={50} max={2000} step={10} unit="₽" />
+            </SectionCard>
+
+            <SectionCard icon={Wind} title="Вентиляция" helpKey="ventilation" onHelp={openHelp}>
+              <SelectField label="Тип кухни" value={ventilation.kitchenType} onChange={(v) => setVentilation({ ...ventilation, kitchenType: v })}
+                options={[{ value: 'hot', label: 'Горячая' }, { value: 'cold', label: 'Холодная' }, { value: 'mixed', label: 'Смешанная' }]} />
+              <SelectField label="Климат" value={String(ventilation.climateZone)} onChange={(v) => setVentilation({ ...ventilation, climateZone: Number(v) })}
+                options={CLIMATE_ZONES.map((z) => ({ value: String(z.temp), label: `${z.label} (${z.temp}°C)` }))} />
+              <SliderField label="t внутри" value={ventilation.indoorTemp} onChange={(v) => setVentilation({ ...ventilation, indoorTemp: v })} min={15} max={30} step={0.5} unit="°C" />
+              <SliderField label="Запас" value={ventilation.safetyFactor} onChange={(v) => setVentilation({ ...ventilation, safetyFactor: v })} min={1} max={2} step={0.05} />
+              <SliderField label="кВт·ч" value={ventilation.electricityPrice} onChange={(v) => setVentilation({ ...ventilation, electricityPrice: v })} min={0.5} max={15} step={0.1} unit="₽" />
+            </SectionCard>
+
+            <div style={{ height: 40 }} />
+          </div>
+
+          {/* ===== ПРАВАЯ КОЛОНКА: РЕЗУЛЬТАТЫ ===== */}
+          <div className="lg:col-span-7 space-y-4" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingLeft: 4 }}>
+            {/* ИТОГО ПРИБЫЛЬ */}
+            <div className="card p-5" style={{ border: `2px solid ${isProfit ? 'var(--success)' : 'var(--danger)'}`, background: isProfit ? 'var(--success-light)' : 'var(--danger-light)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                {isProfit ? <CheckCircle size={18} style={{ color: 'var(--success)' }} /> : <AlertTriangle size={18} style={{ color: 'var(--danger)' }} />}
+                <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Итоговая операционная прибыль</span>
+              </div>
+              <div className="space-y-1.5 text-sm">
+                <ResultRow label="Выручка" value={`${f(results.monthlyRevenue)} ₽`} />
+                <ResultRow label="− Аренда" value={`−${f(results.rent)} ₽`} />
+                <ResultRow label="− ФОТ + налоги" value={`−${f(results.totalPayrollWithTaxes)} ₽`} />
+                <ResultRow label="− Отопление" value={`−${f(results.monthlyHeatingCost)} ₽`} />
+                <ResultRow label="− Себестоимость" value={`−${f(results.totalCOGS)} ₽`} />
+                <div className="divider" style={{ margin: '8px 0' }} />
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-bold" style={{ color: 'var(--text)' }}>Прибыль</span>
+                  <span className="text-xl font-bold tabular-nums" style={{ color: isProfit ? 'var(--success)' : 'var(--danger)' }}>
+                    {f(results.monthlyProfit)} ₽
+                  </span>
+                </div>
+                {results.monthlyRevenue > 0 && (
+                  <div className="text-right">
+                    <span className="text-sm font-semibold" style={{ color: isProfit ? 'var(--success)' : 'var(--danger)' }}>
+                      {((results.monthlyProfit / results.monthlyRevenue) * 100).toFixed(1)}%
+                    </span>
+                    <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>→ 15%+</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Сводка за смену */}
+            <SectionCard icon={TrendingUp} title="Сводка за смену" helpKey="kpi" onHelp={openHelp}>
+              {results.hasHall && (
                 <>
-                  <SliderField label="Официанты" value={waitersCount} onChange={(v) => setWaitersCount(v)} min={0} max={20}
-                    hint={waitersCount > 0 ? `${Math.ceil(hall.seats / waitersCount)} гост/оф.` : ''} />
-                  <SliderField label="ЗП официанта" value={hall.waiterSalary} onChange={(v) => setHall({ ...hall, waiterSalary: v })} min={0} max={100000} step={1000} unit="₽" />
+                  <ResultRow label="Гости (загрузка)" value={`${results.realisticGuestsPerShift} чел.`}
+                    sub={`макс: ${Math.round(hall.seats * (results.turnsPerShift || 0))}`} />
+                  <div className="divider" style={{ margin: '8px 0' }} />
                 </>
               )}
-              <SliderField label="Мойщицы" value={dishwashersCount} onChange={(v) => setDishwashersCount(v)} min={0} max={10}
-                hint={dishwashersCount > 0 ? `${Math.ceil(hall.hallArea / dishwashersCount)} м²/чел.` : ''} />
-              <SliderField label="ЗП мойщицы" value={hall.dishwasherSalary} onChange={(v) => setHall({ ...hall, dishwasherSalary: v })} min={0} max={100000} step={1000} unit="₽" />
-            </div>
-          </SectionCard>
-
-          <SectionCard icon={DollarSign} title="Себестоимость">
-            <SliderField label="Блюд" value={hall.foodCostPercent} onChange={(v) => setHall({ ...hall, foodCostPercent: v })} min={0} max={100} unit="%"
-              hint={`${f(results.foodCostAbs)} ₽`} />
-            <SliderField label="Напитков" value={hall.drinkCostPercent} onChange={(v) => setHall({ ...hall, drinkCostPercent: v })} min={0} max={100} unit="%"
-              hint={`${f(results.drinkCostAbs)} ₽`} />
-            <ResultRow label="Итого себестоимость" value={`${f(results.totalCOGS)} ₽`} bold />
-          </SectionCard>
-
-          <SectionCard icon={Flame} title="Кухня (меню)" helpKey="kitchen" onHelp={openHelp}>
-            <SliderField label="Поваров" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} max={20} />
-            <SliderField label="Параллельность" value={kitchen.parallelism} onChange={(v) => setKitchen({ ...kitchen, parallelism: v })} min={1} max={10} />
-            <div className="mt-3 space-y-2">
-              {kitchen.dishes.map((d) => (
-                <div key={d.id} className="flex items-center gap-2">
-                  <input type="text" value={d.name} onChange={(e) => updateDish(d.id, 'name', e.target.value)}
-                    className="input-field flex-1" style={{ padding: '5px 8px', fontSize: 12 }} />
-                  <input type="number" value={d.time} onChange={(e) => updateDish(d.id, 'time', Number(e.target.value))}
-                    className="input-field" style={{ width: 56, padding: '5px 6px', fontSize: 12 }} placeholder="мин" />
-                  <input type="number" value={d.price} onChange={(e) => updateDish(d.id, 'price', Number(e.target.value))}
-                    className="input-field" style={{ width: 72, padding: '5px 6px', fontSize: 12 }} placeholder="₽" />
-                  <button onClick={() => removeDish(d.id)} className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 transition"
-                    style={{ color: 'var(--danger)', fontSize: 14 }}>×</button>
-                </div>
-              ))}
-              <button onClick={addDish} className="flex items-center gap-1.5 text-xs font-medium mt-2 transition" style={{ color: 'var(--primary)' }}>
-                <Plus size={14} /> Добавить категорию
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard icon={Coffee} title="Кофейня" helpKey="coffee" onHelp={openHelp}>
-            <SliderField label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} max={10} />
-            <SliderField label="Время напитка" value={coffee.drinkTime} onChange={(v) => setCoffee({ ...coffee, drinkTime: v })} min={10} max={300} unit="сек" />
-            <SliderField label="Цена напитка" value={coffee.drinkPrice} onChange={(v) => setCoffee({ ...coffee, drinkPrice: v })} min={50} max={2000} step={10} unit="₽" />
-          </SectionCard>
-
-          <SectionCard icon={Wind} title="Вентиляция" helpKey="ventilation" onHelp={openHelp}>
-            <SelectField label="Тип кухни" value={ventilation.kitchenType} onChange={(v) => setVentilation({ ...ventilation, kitchenType: v })}
-              options={[{ value: 'hot', label: 'Горячая' }, { value: 'cold', label: 'Холодная' }, { value: 'mixed', label: 'Смешанная' }]} />
-            <SelectField label="Климат" value={String(ventilation.climateZone)} onChange={(v) => setVentilation({ ...ventilation, climateZone: Number(v) })}
-              options={CLIMATE_ZONES.map((z) => ({ value: String(z.temp), label: `${z.label} (${z.temp}°C)` }))} />
-            <SliderField label="t внутри" value={ventilation.indoorTemp} onChange={(v) => setVentilation({ ...ventilation, indoorTemp: v })} min={15} max={30} step={0.5} unit="°C" />
-            <SliderField label="Запас" value={ventilation.safetyFactor} onChange={(v) => setVentilation({ ...ventilation, safetyFactor: v })} min={1} max={2} step={0.05} />
-            <SliderField label="кВт·ч" value={ventilation.electricityPrice} onChange={(v) => setVentilation({ ...ventilation, electricityPrice: v })} min={0.5} max={15} step={0.1} unit="₽" />
-          </SectionCard>
-
-          <div style={{ height: 40 }} />
-        </div>
-
-        {/* ===== ПРАВАЯ КОЛОНКА: РЕЗУЛЬТАТЫ ===== */}
-        <div className="lg:col-span-7 space-y-4" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingLeft: 4 }}>
-          {/* ИТОГО ПРИБЫЛЬ */}
-          <div className="card p-5" style={{ border: `2px solid ${isProfit ? 'var(--success)' : 'var(--danger)'}`, background: isProfit ? 'var(--success-light)' : 'var(--danger-light)' }}>
-            <div className="flex items-center gap-2 mb-3">
-              {isProfit ? <CheckCircle size={18} style={{ color: 'var(--success)' }} /> : <AlertTriangle size={18} style={{ color: 'var(--danger)' }} />}
-              <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Итоговая операционная прибыль</span>
-            </div>
-            <div className="space-y-1.5 text-sm">
-              <ResultRow label="Выручка" value={`${f(results.monthlyRevenue)} ₽`} />
-              <ResultRow label="− Аренда" value={`−${f(results.rent)} ₽`} />
-              <ResultRow label="− ФОТ + налоги" value={`−${f(results.totalPayrollWithTaxes)} ₽`} />
-              <ResultRow label="− Отопление" value={`−${f(results.monthlyHeatingCost)} ₽`} />
-              <ResultRow label="− Себестоимость" value={`−${f(results.totalCOGS)} ₽`} />
+              <ResultRow label="Кухня" value={`${results.totalDishes} блюд`}
+                sub={`макс: ${results.kitchenMaxDishes}`}
+                color={results.requiredDishes > results.kitchenMaxDishes ? 'var(--danger)' : undefined} />
+              <ResultRow label="Кофейня" value={`${results.coffeeMaxDrinks} напитков`}
+                sub={results.requiredDrinks > results.coffeeMaxDrinks ? '⚠️ не хватает' : undefined}
+                color={results.requiredDrinks > results.coffeeMaxDrinks ? 'var(--danger)' : undefined} />
               <div className="divider" style={{ margin: '8px 0' }} />
-              <div className="flex items-center justify-between">
-                <span className="text-base font-bold" style={{ color: 'var(--text)' }}>Прибыль</span>
-                <span className="text-xl font-bold tabular-nums" style={{ color: isProfit ? 'var(--success)' : 'var(--danger)' }}>
-                  {f(results.monthlyProfit)} ₽
-                </span>
-              </div>
+              <ResultRow label="Выручка за смену" value={`${f(results.dailyRevenue)} ₽`} bold color="var(--primary)" />
+              <ResultRow label="Выручка за месяц" value={`${f(results.monthlyRevenue)} ₽`} bold />
+            </SectionCard>
+
+            {/* ФОТ */}
+            <SectionCard icon={DollarSign} title="ФОТ и штат">
+              <ResultRow label="Смен" value={`${results.shifts}`} />
+              <ResultRow label="Всего персонала" value={`${results.totalStaff} чел.`} />
+              <div className="divider" style={{ margin: '8px 0' }} />
+              <ResultRow label="ФОТ (чистый)" value={`${f(results.totalPayroll)} ₽`} />
+              <ResultRow label="ФОТ + налоги (×1.45)" value={`${f(results.totalPayrollWithTaxes)} ₽`} bold />
               {results.monthlyRevenue > 0 && (
-                <div className="text-right">
-                  <span className="text-sm font-semibold" style={{ color: isProfit ? 'var(--success)' : 'var(--danger)' }}>
-                    {((results.monthlyProfit / results.monthlyRevenue) * 100).toFixed(1)}%
-                  </span>
-                  <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>→ 15%+</span>
-                </div>
+                <ResultRow label="ФОТ от выручки"
+                  value={`${((results.totalPayrollWithTaxes / results.monthlyRevenue) * 100).toFixed(1)}%`}
+                  sub="→ 22–25%"
+                  color={results.totalPayrollWithTaxes / results.monthlyRevenue > 0.25 ? 'var(--warning)' : 'var(--success)'} />
               )}
-            </div>
-          </div>
-          {/* Сводка за смену */}
-          <SectionCard icon={TrendingUp} title="Сводка за смену" helpKey="kpi" onHelp={openHelp}>
-            {results.hasHall && (
-              <>
-                <ResultRow label="Гости (загрузка)" value={`${results.realisticGuestsPerShift} чел.`}
-                  sub={`макс: ${Math.round(hall.seats * (results.turnsPerShift || 0))}`} />
-                <div className="divider" style={{ margin: '8px 0' }} />
-              </>
-            )}
-            <ResultRow label="Кухня" value={`${results.totalDishes} блюд`}
-              sub={`макс: ${results.kitchenMaxDishes}`}
-              color={results.requiredDishes > results.kitchenMaxDishes ? 'var(--danger)' : undefined} />
-            <ResultRow label="Кофейня" value={`${results.coffeeMaxDrinks} напитков`}
-              sub={results.requiredDrinks > results.coffeeMaxDrinks ? '⚠️ не хватает' : undefined}
-              color={results.requiredDrinks > results.coffeeMaxDrinks ? 'var(--danger)' : undefined} />
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <ResultRow label="Выручка за смену" value={`${f(results.dailyRevenue)} ₽`} bold color="var(--primary)" />
-            <ResultRow label="Выручка за месяц" value={`${f(results.monthlyRevenue)} ₽`} bold />
-          </SectionCard>
+            </SectionCard>
 
-          {/* ФОТ */}
-          <SectionCard icon={DollarSign} title="ФОТ и штат">
-            <ResultRow label="Смен" value={`${results.shifts}`} />
-            <ResultRow label="Всего персонала" value={`${results.totalStaff} чел.`} />
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <ResultRow label="ФОТ (чистый)" value={`${f(results.totalPayroll)} ₽`} />
-            <ResultRow label="ФОТ + налоги (×1.45)" value={`${f(results.totalPayrollWithTaxes)} ₽`} bold />
-            {results.monthlyRevenue > 0 && (
-              <ResultRow label="ФОТ от выручки"
-                value={`${((results.totalPayrollWithTaxes / results.monthlyRevenue) * 100).toFixed(1)}%`}
-                sub="→ 22–25%"
-                color={results.totalPayrollWithTaxes / results.monthlyRevenue > 0.25 ? 'var(--warning)' : 'var(--success)'} />
-            )}
-          </SectionCard>
+            {/* Аренда */}
+            <SectionCard icon={Building} title="Аренда">
+              <ResultRow label="Ставка" value={`${f(hall.rentPerSqm)} ₽/м²`} />
+              <ResultRow label="Площадь" value={`${hall.totalArea} м²`} />
+              <ResultRow label="Аренда/мес" value={`${f(results.rent)} ₽`} bold />
+              <div className="divider" style={{ margin: '8px 0' }} />
+              <ResultRow label="Доля от выручки"
+                value={`${results.rentShare.toFixed(1)}%`}
+                sub="→ до 14%"
+                color={isRentOk ? 'var(--success)' : 'var(--danger)'} />
+              {!isRentOk && (
+                <p className="text-xs mt-2 p-2.5 rounded-lg" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}>
+                  ⚠️ Аренда выше комфортного уровня. Нормальная: {f(results.normalRent)} ₽
+                </p>
+              )}
+            </SectionCard>
 
-          {/* Аренда */}
-          <SectionCard icon={Building} title="Аренда">
-            <ResultRow label="Ставка" value={`${f(hall.rentPerSqm)} ₽/м²`} />
-            <ResultRow label="Площадь" value={`${hall.totalArea} м²`} />
-            <ResultRow label="Аренда/мес" value={`${f(results.rent)} ₽`} bold />
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <ResultRow label="Доля от выручки"
-              value={`${results.rentShare.toFixed(1)}%`}
-              sub="→ до 14%"
-              color={isRentOk ? 'var(--success)' : 'var(--danger)'} />
-            {!isRentOk && (
-              <p className="text-xs mt-2 p-2.5 rounded-lg" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}>
-                ⚠️ Аренда выше комфортного уровня. Нормальная: {f(results.normalRent)} ₽
-              </p>
-            )}
-          </SectionCard>
+            {/* Вентиляция */}
+            <SectionCard icon={Wind} title="Вентиляция и отопление">
+              <ResultRow label="Воздухообмен зал" value={`${f(results.ventHall)} м³/ч`} />
+              <ResultRow label="Воздухообмен кухня" value={`${f(results.ventKit)} м³/ч`} />
+              <ResultRow label="Итого" value={`${f(results.ventTotal)} м³/ч`} bold />
+              <div className="divider" style={{ margin: '8px 0' }} />
+              <ResultRow label="Тепловая мощность" value={`${results.heatTotal.toFixed(1)} кВт`} />
+              <ResultRow label="Отопление/мес" value={`${f(results.monthlyHeatingCost)} ₽`} bold />
+            </SectionCard>
 
-          {/* Вентиляция */}
-          <SectionCard icon={Wind} title="Вентиляция и отопление">
-            <ResultRow label="Воздухообмен зал" value={`${f(results.ventHall)} м³/ч`} />
-            <ResultRow label="Воздухообмен кухня" value={`${f(results.ventKit)} м³/ч`} />
-            <ResultRow label="Итого" value={`${f(results.ventTotal)} м³/ч`} bold />
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <ResultRow label="Тепловая мощность" value={`${results.heatTotal.toFixed(1)} кВт`} />
-            <ResultRow label="Отопление/мес" value={`${f(results.monthlyHeatingCost)} ₽`} bold />
-          </SectionCard>
-
-          {/* Кухня детали */}
-          <SectionCard icon={ChefHat} title="Детализация кухни">
-            <div className="space-y-2">
-              {results.dishRes?.map((d: any) => (
-                <div key={d.id} className="flex items-center justify-between text-sm py-1.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{d.time} мин</span>
-                    <span className="font-medium tabular-nums" style={{ color: 'var(--text)' }}>{d.maxDishes} шт</span>
-                    <span className="font-semibold tabular-nums" style={{ color: 'var(--primary)' }}>{f(d.revenue)} ₽</span>
+            {/* Кухня детали */}
+            <SectionCard icon={ChefHat} title="Детализация кухни">
+              <div className="space-y-2">
+                {results.dishRes?.map((d: any) => (
+                  <div key={d.id} className="flex items-center justify-between text-sm py-1.5 border-b" style={{ borderColor: 'var(--border-light)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{d.time} мин</span>
+                      <span className="font-medium tabular-nums" style={{ color: 'var(--text)' }}>{d.maxDishes} шт</span>
+                      <span className="font-semibold tabular-nums" style={{ color: 'var(--primary)' }}>{f(d.revenue)} ₽</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <ResultRow label="Итого выручка кухни" value={`${f(results.kitchenRev)} ₽`} bold color="var(--primary)" />
-            <ResultRow label="Загрузка кухни"
-              value={`${results.kitchenLoad.toFixed(0)}%`}
-              color={results.kitchenLoad > 95 ? 'var(--danger)' : results.kitchenLoad > 80 ? 'var(--warning)' : 'var(--success)'} />
-            {results.kitchenLoad > 95 && (
-              <p className="text-xs mt-2 p-2.5 rounded-lg" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}>
-                ⚠️ Критическая загрузка — риск сбоев в обслуживании
-              </p>
-            )}
-          </SectionCard>
+                ))}
+              </div>
+              <div className="divider" style={{ margin: '8px 0' }} />
+              <ResultRow label="Итого выручка кухни" value={`${f(results.kitchenRev)} ₽`} bold color="var(--primary)" />
+              <ResultRow label="Загрузка кухни"
+                value={`${results.kitchenLoad.toFixed(0)}%`}
+                color={results.kitchenLoad > 95 ? 'var(--danger)' : results.kitchenLoad > 80 ? 'var(--warning)' : 'var(--success)'} />
+              {results.kitchenLoad > 95 && (
+                <p className="text-xs mt-2 p-2.5 rounded-lg" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}>
+                  ⚠️ Критическая загрузка — риск сбоев в обслуживании
+                </p>
+              )}
+            </SectionCard>
 
-          {/* Кофейня детали */}
-          <SectionCard icon={Coffee} title="Детализация кофейни">
-            <ResultRow label="Макс. напитков" value={`${results.coffeeMaxDrinks}`} />
-            <ResultRow label="Выручка кофейни" value={`${f(results.coffeeRev)} ₽`} bold color="var(--primary)" />
-          </SectionCard>
+            {/* Кофейня детали */}
+            <SectionCard icon={Coffee} title="Детализация кофейни">
+              <ResultRow label="Макс. напитков" value={`${results.coffeeMaxDrinks}`} />
+              <ResultRow label="Выручка кофейни" value={`${f(results.coffeeRev)} ₽`} bold color="var(--primary)" />
+            </SectionCard>
 
-          {/* Себестоимость */}
-          <SectionCard icon={DollarSign} title="Себестоимость">
-            <ResultRow label="Блюда" value={`${f(results.foodCostAbs)} ₽`} sub={`${hall.foodCostPercent}%`} />
-            <ResultRow label="Напитки" value={`${f(results.drinkCostAbs)} ₽`} sub={`${hall.drinkCostPercent}%`} />
-            <div className="divider" style={{ margin: '8px 0' }} />
-            <ResultRow label="Итого себестоимость" value={`${f(results.totalCOGS)} ₽`} bold />
-            {results.monthlyRevenue > 0 && (
-              <ResultRow label="Общий food cost"
-                value={`${((results.totalCOGS / results.monthlyRevenue) * 100).toFixed(1)}%`}
-                sub="→ 28–32%"
-                color={results.totalCOGS / results.monthlyRevenue > 0.32 ? 'var(--warning)' : 'var(--success)'} />
-            )}
-          </SectionCard>
+            {/* Себестоимость */}
+            <SectionCard icon={DollarSign} title="Себестоимость">
+              <ResultRow label="Блюда" value={`${f(results.foodCostAbs)} ₽`} sub={`${hall.foodCostPercent}%`} />
+              <ResultRow label="Напитки" value={`${f(results.drinkCostAbs)} ₽`} sub={`${hall.drinkCostPercent}%`} />
+              <div className="divider" style={{ margin: '8px 0' }} />
+              <ResultRow label="Итого себестоимость" value={`${f(results.totalCOGS)} ₽`} bold />
+              {results.monthlyRevenue > 0 && (
+                <ResultRow label="Общий food cost"
+                  value={`${((results.totalCOGS / results.monthlyRevenue) * 100).toFixed(1)}%`}
+                  sub="→ 28–32%"
+                  color={results.totalCOGS / results.monthlyRevenue > 0.32 ? 'var(--warning)' : 'var(--success)'} />
+              )}
+            </SectionCard>
 
-
-
-          <div style={{ height: 40 }} />
+            <div style={{ height: 40 }} />
+          </div>
         </div>
-      </div>
 
-      {/* Help Modal */}
-      <HelpModal isOpen={helpModal.open} onClose={closeHelp} title={helpTexts[helpModal.block]?.title || ''}>
-        {helpTexts[helpModal.block]?.text || ''}
-      </HelpModal>
-    </div>
+        {/* Help Modal */}
+        <HelpModal isOpen={helpModal.open} onClose={closeHelp} title={helpTexts[helpModal.block]?.title || ''}>
+          {helpTexts[helpModal.block]?.text || ''}
+        </HelpModal>
+      </div>
+    </ErrorBoundary>
   );
 }

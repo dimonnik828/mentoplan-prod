@@ -1,6 +1,6 @@
-// app/api/admin/ttk/[id]/route.ts
+// app/api/ingredients/[id]/route.ts
 import { NextResponse } from 'next/server';
-import { ttkUpdateSchema } from '@/lib/validations';
+import { ingredientUpdateSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 import { PrismaClient } from '@prisma/client';
 
@@ -8,11 +8,11 @@ const prisma = new PrismaClient();
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const ttk = await prisma.tTK.findUnique({ where: { id: params.id }, include: { ingredients: true } });
-    if (!ttk) return NextResponse.json({ error: 'ТТК не найдена' }, { status: 404 });
-    return NextResponse.json(ttk);
+    const ingredient = await prisma.ingredient.findUnique({ where: { id: params.id } });
+    if (!ingredient) return NextResponse.json({ error: 'Ингредиент не найден' }, { status: 404 });
+    return NextResponse.json(ingredient);
   } catch (error) {
-    console.error('[API admin/ttk GET by id]', error);
+    console.error('[API ingredients/[id] GET]', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
@@ -27,28 +27,15 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     let body;
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 }); }
 
-    const parsed = ttkUpdateSchema.parse(body);
+    const parsed = ingredientUpdateSchema.parse(body);
 
     const updateData: any = {};
     if (parsed.name !== undefined) updateData.name = parsed.name;
-    if (parsed.description !== undefined) updateData.description = parsed.description;
-    if (parsed.price !== undefined) updateData.price = parsed.price;
-    if (parsed.categoryId !== undefined) updateData.categoryId = parsed.categoryId;
+    if (parsed.unit !== undefined) updateData.unit = parsed.unit;
+    if (parsed.pricePerUnit !== undefined) updateData.pricePerUnit = parsed.pricePerUnit;
 
-    const ttk = await prisma.tTK.update({ where: { id: params.id }, data: updateData });
-
-    // Обновление ингредиентов, если переданы
-    if (parsed.ingredients) {
-      // Удаляем старые связи
-      await prisma.tTKIngredient.deleteMany({ where: { ttkId: params.id } });
-      for (const ing of parsed.ingredients) {
-        await prisma.tTKIngredient.create({
-          data: { ttkId: params.id, ingredientId: ing.ingredientId, quantity: ing.quantity },
-        });
-      }
-    }
-
-    return NextResponse.json({ success: true, data: ttk });
+    const ingredient = await prisma.ingredient.update({ where: { id: params.id }, data: updateData });
+    return NextResponse.json({ success: true, data: ingredient });
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -56,17 +43,17 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         { status: 400 }
       );
     }
-    console.error('[API admin/ttk PUT]', error);
+    console.error('[API ingredients/[id] PUT]', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    await prisma.tTK.delete({ where: { id: params.id } });
+    await prisma.ingredient.delete({ where: { id: params.id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[API admin/ttk DELETE]', error);
+    console.error('[API ingredients/[id] DELETE]', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
