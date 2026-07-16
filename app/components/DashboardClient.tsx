@@ -2,13 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePlan } from '../../lib/usePlan';
 import {
-  Wallet,
-  Megaphone,
-  UsersRound,
   CheckCircle,
-  ChevronDown,
   Edit,
   TrendingUp,
   TrendingDown,
@@ -27,6 +22,7 @@ type BusinessData = {
   hallArea: number;
   seats: number;
   staffCount: number;
+  dailyGuests: number; // новое поле
   avgCheck: number;
   revenue: number;
   rent: number;
@@ -55,6 +51,7 @@ const defaultBusiness: BusinessData = {
   hallArea: 80,
   seats: 48,
   staffCount: 12,
+  dailyGuests: 50, // начальное значение
   avgCheck: 1050,
   revenue: 3200000,
   rent: 576000,
@@ -77,6 +74,30 @@ const defaultBusiness: BusinessData = {
 const formatPercent = (value: number): string => value.toFixed(2);
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
 
+// Нормы для цветовой индикации
+const NORMS: Record<string, { green: number; orange: number; red: number; higherIsBetter?: boolean }> = {
+  foodCostPercent: { green: 32, orange: 38, red: 38 },
+  payrollPercent: { green: 25, orange: 30, red: 30 },
+  rentPercent: { green: 14, orange: 18, red: 18 },
+  profitPercent: { green: 15, orange: 10, red: 10, higherIsBetter: true },
+};
+
+type ColorLevel = 'green' | 'orange' | 'red' | 'neutral';
+
+const getColorLevel = (key: string, value: number): { color: ColorLevel; css: string } => {
+  const norm = NORMS[key];
+  if (!norm) return { color: 'neutral', css: '#6b7280' };
+  if (norm.higherIsBetter) {
+    if (value >= norm.green) return { color: 'green', css: '#10b981' };
+    if (value >= norm.orange) return { color: 'orange', css: '#f59e0b' };
+    return { color: 'red', css: '#ef4444' };
+  } else {
+    if (value <= norm.green) return { color: 'green', css: '#10b981' };
+    if (value <= norm.orange) return { color: 'orange', css: '#f59e0b' };
+    return { color: 'red', css: '#ef4444' };
+  }
+};
+
 const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const revenue = data.revenue ?? defaultBusiness.revenue;
   const rent = data.rent ?? defaultBusiness.rent;
@@ -95,24 +116,23 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const operatingProfit = revenue - rent - utilities - payroll - managementCosts - costOfGoods - otherExpenses;
   const profitPercent = revenue ? Math.round((operatingProfit / revenue) * 100) : 0;
 
-  const healthIndex = Math.min(
-    100,
-    Math.max(
-      0,
-      Math.round(
-        100 -
-        (rentPercent > 14 ? (rentPercent - 14) * 2 : 0) -
-        (payrollPercent > 25 ? (payrollPercent - 25) * 1.5 : 0) -
-        (foodCostPercent > 32 ? (foodCostPercent - 32) * 1.2 : 0) +
-        (profitPercent > 10 ? (profitPercent - 10) * 2 : 0)
-      )
-    )
-  );
+  const params: [string, number][] = [
+    ['foodCostPercent', foodCostPercent],
+    ['payrollPercent', payrollPercent],
+    ['rentPercent', rentPercent],
+    ['profitPercent', profitPercent],
+  ];
+  let greenCount = 0;
+  params.forEach(([key, val]) => {
+    if (getColorLevel(key, val).color === 'green') greenCount++;
+  });
+  const healthIndex = Math.round((greenCount / params.length) * 100);
 
   return {
     ...defaultBusiness,
     ...data,
     venueType: data.venueType ?? defaultBusiness.venueType,
+    dailyGuests: data.dailyGuests ?? defaultBusiness.dailyGuests,
     revenue,
     rent,
     utilities,
@@ -132,39 +152,6 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   };
 };
 
-const getAttentionZones = (data: BusinessData) => {
-  const zones: { id: string; title: string; status: string; description: string; potential: string }[] = [];
-  if (data.rentPercent > 14) {
-    zones.push({
-      id: '1', title: 'Аренда выше комфортного уровня', status: 'critical',
-      description: `Аренда составляет ${formatPercent(data.rentPercent)}% от выручки, ориентир — до 14%.`,
-      potential: `Снизить нагрузку на ${Math.round((data.rentPercent - 14) / 100 * data.revenue)} ₽ в месяц.`,
-    });
-  }
-  if (data.foodCostPercent > 32) {
-    zones.push({
-      id: '2', title: 'Высокая себестоимость', status: 'attention',
-      description: `Food cost составляет ${formatPercent(data.foodCostPercent)}%, целевой уровень — до 32%.`,
-      potential: 'Оптимизировать закупки и пересмотреть граммовки популярных блюд.',
-    });
-  }
-  if (data.profitPercent < 12) {
-    zones.push({
-      id: '3', title: 'Низкая операционная прибыль', status: 'attention',
-      description: `Прибыль составляет ${formatPercent(data.profitPercent)}% от выручки, потенциал — 15%+.`,
-      potential: 'Сократить долю аренды и ФОТ, увеличить дневную выручку.',
-    });
-  }
-  if (zones.length === 0) {
-    zones.push({
-      id: '0', title: 'Бизнес в хорошей форме', status: 'opportunity',
-      description: 'Все ключевые показатели в норме.',
-      potential: 'Сосредоточьтесь на росте и масштабировании.',
-    });
-  }
-  return zones;
-};
-
 const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'info'; onClose: () => void }) => {
   useEffect(() => {
     const t = setTimeout(onClose, 3000);
@@ -180,86 +167,22 @@ const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 
   );
 };
 
-const HealthGauge = ({ score }: { score: number }) => {
-  const pct = Math.min(100, Math.max(0, score));
-  const r = 52;
-  const circ = 2 * Math.PI * r;
-  const color = pct >= 70 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
-  const label = pct >= 70 ? 'Хорошо' : pct >= 50 ? 'Зона внимания' : 'Требует действий';
-  const badgeClass = pct >= 70 ? 'badge-success' : pct >= 50 ? 'badge-warning' : 'badge-danger';
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: 120, height: 120 }}>
-        <svg width={120} height={120} className="-rotate-90">
-          <circle cx={60} cy={60} r={r} fill="none" stroke="#f3f4f6" strokeWidth={10} />
-          <circle cx={60} cy={60} r={r} fill="none" stroke={color} strokeWidth={10}
-            strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{score}</span>
-          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>из 100</span>
-        </div>
-      </div>
-      <span className={`badge ${badgeClass} mt-3`}>{label}</span>
-    </div>
-  );
-};
-
-const AttentionZoneCard = ({ zone }: { zone: { id: string; title: string; status: string; description: string; potential: string } }) => {
-  const styles: Record<string, { bg: string; border: string; label: string; labelClass: string }> = {
-    critical: { bg: 'var(--danger-light)', border: 'var(--danger)', label: 'Критично', labelClass: 'badge-danger' },
-    attention: { bg: 'var(--warning-light)', border: 'var(--warning)', label: 'Внимание', labelClass: 'badge-warning' },
-    opportunity: { bg: 'var(--success-light)', border: 'var(--success)', label: 'Хорошо', labelClass: 'badge-success' },
-  };
-  const s = styles[zone.status] || styles.attention;
-  return (
-    <div className="card p-4" style={{ borderLeftWidth: 3, borderLeftColor: s.border, background: s.bg }}>
-      <span className={`badge ${s.labelClass} mb-2`}>{s.label}</span>
-      <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>{zone.title}</h4>
-      <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>{zone.description}</p>
-      <p className="text-xs" style={{ color: 'var(--text-muted)' }}><span className="font-medium">Потенциал:</span> {zone.potential}</p>
-    </div>
-  );
-};
-
-const CostRow = ({ label, value, target, bold, color }: { label: string; value: number; target?: string; bold?: boolean; color?: string }) => (
-  <div className="flex items-center justify-between py-2">
-    <div className="flex items-center gap-2">
-      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color || 'var(--text-muted)' }} />
-      <span className="text-sm" style={{ color: 'var(--text-secondary)', fontWeight: bold ? 600 : 400 }}>{label}</span>
-    </div>
-    <div className="flex items-center gap-3">
-      <span className="text-sm font-semibold tabular-nums" style={{ color: color || 'var(--text)', fontWeight: bold ? 700 : 600 }}>
-        {formatPercent(value)}%
-      </span>
-      {target && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{target}</span>}
-    </div>
-  </div>
-);
-
-const AccordionSection = ({
-  title, icon: Icon, children, defaultOpen = false,
-}: {
-  title: string; icon: React.ElementType; children: React.ReactNode; defaultOpen?: boolean;
+const MetricRow = ({ label, value, unit = '%', target, colorLevel }: {
+  label: string; value: number; unit?: string; target?: string; colorLevel: ColorLevel;
 }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const cssColor = colorLevel === 'green' ? '#10b981' : colorLevel === 'orange' ? '#f59e0b' : colorLevel === 'red' ? '#ef4444' : '#6b7280';
   return (
-    <div className="card overflow-hidden">
-      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50/50 transition">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary-light)' }}>
-            <Icon size={16} style={{ color: 'var(--primary)' }} />
-          </div>
-          <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</span>
-        </div>
-        <ChevronDown size={18} style={{ color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }} />
-      </button>
-      {isOpen && (
-        <div className="px-5 pb-5 pt-0 border-t" style={{ borderColor: 'var(--border-light)' }}>
-          {children}
-        </div>
-      )}
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cssColor }} />
+        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-semibold tabular-nums" style={{ color: cssColor }}>
+          {unit === '₽' ? fmt(value) + ' ₽' : `${formatPercent(value)}%`}
+        </span>
+        {target && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{target}</span>}
+      </div>
     </div>
   );
 };
@@ -291,13 +214,14 @@ const DataModal = ({ isOpen, onClose, data, onSave }: {
     { name: 'hallArea', label: 'Площадь зала (м²)' },
     { name: 'seats', label: 'Посадочных мест' },
     { name: 'staffCount', label: 'Количество сотрудников' },
+    { name: 'dailyGuests', label: 'Гостей в день (среднее)' },
     { name: 'revenue', label: 'Выручка в месяц (₽)' },
     { name: 'avgCheck', label: 'Средний чек (₽)' },
     { name: 'rent', label: 'Аренда (₽)' },
     { name: 'utilities', label: 'Коммунальные платежи (₽)' },
     { name: 'payroll', label: 'ФОТ (₽)' },
     { name: 'managementCosts', label: 'Затраты на управление (₽)' },
-    { name: 'costOfGoods', label: 'Себестоимость (₽)' },
+    { name: 'costOfGoods', label: 'Foodcost (₽)' },
     { name: 'otherExpenses', label: 'Прочие расходы (₽)' },
   ];
 
@@ -327,7 +251,7 @@ const DataModal = ({ isOpen, onClose, data, onSave }: {
             <div>
               <label className="section-label block">Площади и ресурсы</label>
               <div className="grid grid-cols-2 gap-3">
-                {fields.slice(0, 4).map(f => (
+                {fields.slice(0, 5).map(f => (
                   <div key={f.name}>
                     <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
                     <input type="number" name={f.name} value={form[f.name as keyof BusinessData] as number} onChange={handleChange} className="input-field" />
@@ -338,7 +262,7 @@ const DataModal = ({ isOpen, onClose, data, onSave }: {
             <div>
               <label className="section-label block">Финансы (₽/мес)</label>
               <div className="grid grid-cols-2 gap-3">
-                {fields.slice(4).map(f => (
+                {fields.slice(5).map(f => (
                   <div key={f.name}>
                     <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
                     <input type="number" name={f.name} value={form[f.name as keyof BusinessData] as number} onChange={handleChange} className="input-field" />
@@ -362,7 +286,6 @@ export default function DashboardClient() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const { plan, addAction, removeAction } = usePlan();
 
   useEffect(() => {
     const loadData = async () => {
@@ -371,6 +294,7 @@ export default function DashboardClient() {
         if (res.ok) {
           const data = await res.json();
           const b: BusinessData = {
+            ...defaultBusiness,
             name: data.name || defaultBusiness.name,
             address: data.address || '',
             venueType: data.venueType || 'cafe',
@@ -378,6 +302,7 @@ export default function DashboardClient() {
             hallArea: data.hallArea || 0,
             seats: data.seats || 0,
             staffCount: data.staffCount || 0,
+            dailyGuests: data.dailyGuests || defaultBusiness.dailyGuests,
             avgCheck: data.avgCheck || 0,
             revenue: data.revenue || 0,
             rent: data.rent || 0,
@@ -386,15 +311,6 @@ export default function DashboardClient() {
             managementCosts: data.managementCosts || 0,
             costOfGoods: data.costOfGoods || 0,
             otherExpenses: data.otherExpenses || 0,
-            foodCostPercent: data.foodCostPercent || 0,
-            payrollPercent: data.payrollPercent || 0,
-            rentPercent: data.rentPercent || 0,
-            utilitiesPercent: data.utilitiesPercent || 0,
-            managementPercent: data.managementPercent || 0,
-            otherPercent: data.otherPercent || 0,
-            profitPercent: data.profitPercent || 0,
-            operatingProfit: data.profitAbsolute || 0,
-            healthIndex: data.healthIndex || 0,
           };
           setBusinessData(b);
           localStorage.setItem('momentoBusinessData', JSON.stringify(b));
@@ -425,6 +341,7 @@ export default function DashboardClient() {
         hallArea: updated.hallArea,
         seats: updated.seats,
         staffCount: updated.staffCount,
+        dailyGuests: updated.dailyGuests,
         avgCheck: updated.avgCheck,
         revenue: updated.revenue,
         rent: updated.rent,
@@ -434,23 +351,37 @@ export default function DashboardClient() {
         costOfGoods: updated.costOfGoods,
         otherExpenses: updated.otherExpenses,
       };
-      const res = await fetch('/api/analyze', {
+      await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      setToast({ message: res.ok ? 'Данные сохранены' : 'Ошибка сохранения', type: res.ok ? 'success' : 'info' });
+      setToast({ message: 'Данные сохранены', type: 'success' });
     } catch {
       setToast({ message: 'Ошибка соединения', type: 'info' });
     }
   };
 
-  const attentionZones = getAttentionZones(businessData);
   const kpis = [
-    { label: 'Выручка/мес', value: `${fmt(businessData.revenue)} ₽`, sub: `Чек: ${fmt(businessData.avgCheck)} ₽`, cls: 'kpi-indigo' as const, icon: TrendingUp },
-    { label: 'Операционная прибыль', value: `${formatPercent(businessData.profitPercent)}%`, sub: `${fmt(businessData.operatingProfit)} ₽`, cls: businessData.profitPercent >= 10 ? 'kpi-emerald' as const : 'kpi-rose' as const, icon: businessData.profitPercent >= 10 ? TrendingUp : TrendingDown },
-    { label: 'Food cost', value: `${formatPercent(businessData.foodCostPercent)}%`, sub: businessData.foodCostPercent > 32 ? 'Выше нормы' : 'В норме', cls: businessData.foodCostPercent > 32 ? 'kpi-amber' as const : 'kpi-emerald' as const, icon: businessData.foodCostPercent > 32 ? AlertTriangle : CheckCircle },
-    { label: 'ФОТ', value: `${formatPercent(businessData.payrollPercent)}%`, sub: businessData.payrollPercent > 25 ? 'Выше нормы' : 'В норме', cls: businessData.payrollPercent > 25 ? 'kpi-amber' as const : 'kpi-emerald' as const, icon: businessData.payrollPercent > 25 ? AlertTriangle : CheckCircle },
+    { label: 'Выручка/мес', value: `${fmt(businessData.revenue)} ₽`, sub: `Чек: ${fmt(businessData.avgCheck)} ₽` },
+    {
+      label: 'Операционная прибыль',
+      value: `${formatPercent(businessData.profitPercent)}%`,
+      sub: `${fmt(businessData.operatingProfit)} ₽`,
+      colorLevel: getColorLevel('profitPercent', businessData.profitPercent).color,
+    },
+    {
+      label: 'Food cost',
+      value: `${formatPercent(businessData.foodCostPercent)}%`,
+      sub: businessData.foodCostPercent > 32 ? 'Выше нормы' : 'В норме',
+      colorLevel: getColorLevel('foodCostPercent', businessData.foodCostPercent).color,
+    },
+    {
+      label: 'ФОТ',
+      value: `${formatPercent(businessData.payrollPercent)}%`,
+      sub: businessData.payrollPercent > 25 ? 'Выше нормы' : 'В норме',
+      colorLevel: getColorLevel('payrollPercent', businessData.payrollPercent).color,
+    },
   ];
 
   if (loading) {
@@ -461,18 +392,6 @@ export default function DashboardClient() {
             {[...Array(4)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-4">
-              <div className="card p-6 flex flex-col items-center justify-center">
-                <Skeleton className="h-24 w-24 rounded-full" />
-                <Skeleton className="h-4 w-32 mt-4" />
-              </div>
-            </div>
-            <div className="lg:col-span-8 space-y-3">
-              <Skeleton className="h-32 rounded-xl" />
-              <Skeleton className="h-24 rounded-xl" />
-            </div>
           </div>
         </div>
       </ErrorBoundary>
@@ -486,101 +405,55 @@ export default function DashboardClient() {
           <div>
             <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>{businessData.name}</h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {businessData.address} · {attentionZones.filter(z => z.status !== 'opportunity').length} зон требуют внимания
+              {businessData.address} · Гостей в день: {businessData.dailyGuests}
             </p>
           </div>
           <button onClick={() => setIsModalOpen(true)} className="btn-primary"><Edit size={16} /> Изменить данные</button>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {kpis.map(kpi => (
-            <div key={kpi.label} className={`kpi-card ${kpi.cls}`}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{kpi.label}</span>
-                <kpi.icon size={16} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+          {kpis.map((kpi, i) => (
+            <div key={i} className="card p-4 bg-white rounded-xl border border-gray-100">
+              <div className="text-xs font-medium text-gray-400 mb-1">{kpi.label}</div>
+              <div className={`text-lg font-bold tabular-nums ${kpi.colorLevel === 'green' ? 'text-emerald-600' : kpi.colorLevel === 'orange' ? 'text-amber-600' : kpi.colorLevel === 'red' ? 'text-red-600' : 'text-gray-900'}`}>
+                {kpi.value}
               </div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text)' }}>{kpi.value}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{kpi.sub}</div>
+              <div className="text-xs text-gray-400 mt-1">{kpi.sub}</div>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-          <div className="lg:col-span-4 card p-6 flex flex-col items-center justify-center">
-            <div className="section-label text-center w-full">Индекс здоровья</div>
-            <HealthGauge score={businessData.healthIndex} />
-            <p className="text-xs text-center mt-4" style={{ color: 'var(--text-secondary)', maxWidth: 200 }}>
-              {businessData.healthIndex >= 70 ? 'Бизнес в хорошей форме, но есть потенциал для роста.' :
-               businessData.healthIndex >= 50 ? 'Есть зоны, требующие внимания. Сосредоточьтесь на ключевых проблемах.' :
-               'Необходимо срочно принять меры для улучшения показателей.'}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-4 justify-center">
-              <button className="btn-primary" style={{ padding: '7px 14px', fontSize: 12 }}>Полная диагностика</button>
-              <button className="btn-ghost" style={{ padding: '7px 14px', fontSize: 12 }}>План на 30 дней</button>
-            </div>
-          </div>
-          <div className="lg:col-span-8">
-            <div className="section-label">Зоны внимания</div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {attentionZones.map(zone => <AttentionZoneCard key={zone.id} zone={zone} />)}
-            </div>
-          </div>
-        </div>
-
         <div className="card p-5 mb-6">
           <div className="section-label">На что уходит выручка</div>
-          <CostRow label="Себестоимость" value={businessData.foodCostPercent} target="→ 28–32%" color={businessData.foodCostPercent > 32 ? 'var(--warning)' : 'var(--success)'} />
-          <CostRow label="ФОТ" value={businessData.payrollPercent} target="→ 22–25%" color={businessData.payrollPercent > 25 ? 'var(--warning)' : 'var(--success)'} />
-          <CostRow label="Аренда" value={businessData.rentPercent} target="→ до 14%" color={businessData.rentPercent > 14 ? 'var(--danger)' : 'var(--success)'} />
-          <CostRow label="Коммунальные" value={businessData.utilitiesPercent} color="#8b5cf6" />
-          <CostRow label="Управление" value={businessData.managementPercent} color="#8b5cf6" />
-          <CostRow label="Прочие" value={businessData.otherPercent} color="#8b5cf6" />
+          <MetricRow label="Foodcost" value={businessData.foodCostPercent} target="→ 28–32%" colorLevel={getColorLevel('foodCostPercent', businessData.foodCostPercent).color} />
+          <MetricRow label="ФОТ" value={businessData.payrollPercent} target="→ 22–25%" colorLevel={getColorLevel('payrollPercent', businessData.payrollPercent).color} />
+          <MetricRow label="Аренда" value={businessData.rentPercent} target="→ до 14%" colorLevel={getColorLevel('rentPercent', businessData.rentPercent).color} />
+          <MetricRow label="Коммунальные" value={businessData.utilitiesPercent} colorLevel="neutral" />
+          <MetricRow label="Управление" value={businessData.managementPercent} colorLevel="neutral" />
+          <MetricRow label="Прочие" value={businessData.otherPercent} colorLevel="neutral" />
           <div className="divider" />
-          <CostRow label="Операционная прибыль" value={businessData.profitPercent} target="→ 15%+" bold color={businessData.profitPercent >= 10 ? 'var(--success)' : 'var(--danger)'} />
-          <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
-            Главное ограничение прибыли — сочетание высокой аренды ({formatPercent(businessData.rentPercent)}%) и затрат на персонал ({formatPercent(businessData.payrollPercent)}%).
-          </p>
+          <MetricRow label="Операционная прибыль" value={businessData.profitPercent} target="→ 15%+" colorLevel={getColorLevel('profitPercent', businessData.profitPercent).color} />
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-gray-700">Индекс здоровья</span>
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${businessData.healthIndex}%`, backgroundColor: businessData.healthIndex >= 70 ? '#10b981' : businessData.healthIndex >= 40 ? '#f59e0b' : '#ef4444' }} />
+                </div>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{businessData.healthIndex}%</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <AccordionSection title="Маркетинг и спрос" icon={Megaphone} defaultOpen>
-            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Точка недополучает дневной спрос: рядом расположены офисы, но предложение для бизнес-ланча не сформировано.</p>
-            <div className="rounded-lg p-4" style={{ background: 'var(--border-light)' }}>
-              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text)' }}>Ключевые метрики:</div>
-              <div className="space-y-1.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                <div className="flex justify-between"><span>Средний чек</span><span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(businessData.avgCheck)} ₽</span></div>
-                <div className="flex justify-between"><span>Выручка</span><span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(businessData.revenue)} ₽/мес</span></div>
-                <div className="flex justify-between"><span>Потенциал роста</span><span className="font-semibold" style={{ color: 'var(--success)' }}>+8–12%</span></div>
-              </div>
-            </div>
-          </AccordionSection>
-
-          <AccordionSection title="Финансы" icon={Wallet} defaultOpen>
-            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Доля аренды составляет {formatPercent(businessData.rentPercent)}% выручки, целевой ориентир — до 14%.</p>
-            <div className="rounded-lg p-4" style={{ background: 'var(--border-light)' }}>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span style={{ color: 'var(--text-secondary)' }}>Food cost</span><span className="font-medium" style={{ color: 'var(--text)' }}>{formatPercent(businessData.foodCostPercent)}% <span style={{ color: 'var(--text-muted)' }}>(→ 28–32%)</span></span></div>
-                <div className="flex justify-between"><span style={{ color: 'var(--text-secondary)' }}>ФОТ</span><span className="font-medium" style={{ color: 'var(--text)' }}>{formatPercent(businessData.payrollPercent)}% <span style={{ color: 'var(--text-muted)' }}>(→ 22–25%)</span></span></div>
-                <div className="flex justify-between"><span style={{ color: 'var(--text-secondary)' }}>Аренда</span><span className="font-medium" style={{ color: 'var(--text)' }}>{formatPercent(businessData.rentPercent)}% <span style={{ color: 'var(--text-muted)' }}>(→ до 14%)</span></span></div>
-                <div className="divider" style={{ margin: '8px 0' }} />
-                <div className="flex justify-between"><span className="font-semibold" style={{ color: 'var(--text)' }}>Операционная прибыль</span><span className="font-bold" style={{ color: 'var(--success)' }}>{formatPercent(businessData.profitPercent)}% <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(→ 15%+)</span></span></div>
-              </div>
-            </div>
-          </AccordionSection>
-
-          <AccordionSection title="Операции и команда" icon={UsersRound} defaultOpen>
-            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>У 30% блюд нет актуальных ТТК, поэтому сложно контролировать себестоимость.</p>
-            <div className="rounded-lg p-4" style={{ background: 'var(--border-light)' }}>
-              <ul className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)', listStyle: 'none', padding: 0, margin: 0 }}>
-                {['30% блюд без актуальных ТТК', 'Расписание смен не привязано к спросу', 'Текучесть персонала: 18% за квартал'].map(item => (
-                  <li key={item} className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--warning)' }} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </AccordionSection>
+        <div className="card p-5">
+          <div className="section-label">Экспресс-аудит</div>
+          <div className="space-y-3 mt-3">
+            <MetricRow label="Foodcost" value={businessData.foodCostPercent} target="→ 28–32%" colorLevel={getColorLevel('foodCostPercent', businessData.foodCostPercent).color} />
+            <MetricRow label="ФОТ" value={businessData.payrollPercent} target="→ 22–25%" colorLevel={getColorLevel('payrollPercent', businessData.payrollPercent).color} />
+            <MetricRow label="Аренда" value={businessData.rentPercent} target="→ до 14%" colorLevel={getColorLevel('rentPercent', businessData.rentPercent).color} />
+            <MetricRow label="Прибыль" value={businessData.profitPercent} target="→ 15%+" colorLevel={getColorLevel('profitPercent', businessData.profitPercent).color} />
+          </div>
         </div>
 
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

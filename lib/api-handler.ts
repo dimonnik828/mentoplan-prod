@@ -138,6 +138,7 @@ export async function apiHandler<T>({
 
   // 3. Валидация данных
   let validatedData: T;
+  console.log('Тело запроса:', body);
   try {
     validatedData = schema ? schema.parse(body) : (body as T);
   } catch (error) {
@@ -146,7 +147,7 @@ export async function apiHandler<T>({
       return NextResponse.json(
         {
           error: 'Ошибка валидации',
-          details: error.errors.map((e) => ({
+          details: error.issues.map((e) => ({
             field: e.path.join('.'),
             message: e.message,
           })),
@@ -154,6 +155,7 @@ export async function apiHandler<T>({
         { status: 400 }
       );
     }
+    // Другие ошибки (например, синтаксические) уже обработаны выше
     throw error;
   }
 

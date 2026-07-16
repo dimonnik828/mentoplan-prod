@@ -44,8 +44,11 @@ interface LocationSettings {
   district: string;
   locationType: string;
   competitors: number;
-  potentialGuests: number;
   competitorInfluence: number;
+  totalPopulation: number;        // тыс. чел
+  targetAudiencePercent: number;  // %
+  conversionRate: number;         // %
+  potentialGuests: number;        // тыс. чел/мес (вычисляется)
 }
 
 interface DashboardData {
@@ -61,19 +64,21 @@ interface DashboardData {
    КОНСТАНТЫ
    ============================================================ */
 const PREP_RATIO = 15;
+const PEAK_MINUTES = 60;
 
 const VENUE_TYPES: Record<string, {
   label: string; hallRate: number; waiterRatio: number; dishwasherRatio: number;
   guestTime: number; turnsPerShift: number; hasHall: boolean;
   areaPerSeat: [number, number];
   areaPerCook: [number, number];
+  maxTurnsPerDay: number;
 }> = {
-  restaurant: { label: 'Ресторан', hallRate: 3.0, waiterRatio: 20, dishwasherRatio: 100, guestTime: 50, turnsPerShift: 1.8, hasHall: true, areaPerSeat: [2.5, 3.5], areaPerCook: [5, 6] },
-  coffee: { label: 'Кофейня', hallRate: 3.5, waiterRatio: 40, dishwasherRatio: 100, guestTime: 25, turnsPerShift: 3.0, hasHall: true, areaPerSeat: [1.5, 1.8], areaPerCook: [4, 5] },
-  cafe: { label: 'Кафе', hallRate: 3.2, waiterRatio: 40, dishwasherRatio: 100, guestTime: 35, turnsPerShift: 2.2, hasHall: true, areaPerSeat: [1.8, 2.2], areaPerCook: [5, 6] },
-  canteen: { label: 'Столовая', hallRate: 4.5, waiterRatio: 0, dishwasherRatio: 100, guestTime: 20, turnsPerShift: 3.5, hasHall: true, areaPerSeat: [1.8, 2.2], areaPerCook: [5, 6] },
-  fastfood: { label: 'Быстрое обслуживание', hallRate: 4.0, waiterRatio: 0, dishwasherRatio: 100, guestTime: 10, turnsPerShift: 4.5, hasHall: true, areaPerSeat: [1.2, 1.5], areaPerCook: [3, 4] },
-  darkkitchen: { label: 'Дарк китчен (доставка)', hallRate: 0, waiterRatio: 0, dishwasherRatio: 50, guestTime: 0, turnsPerShift: 0, hasHall: false, areaPerSeat: [0, 0], areaPerCook: [6, 8] },
+  restaurant: { label: 'Ресторан', hallRate: 3.0, waiterRatio: 20, dishwasherRatio: 100, guestTime: 50, turnsPerShift: 1.8, hasHall: true, areaPerSeat: [2.5, 3.5], areaPerCook: [5, 6], maxTurnsPerDay: 2 },
+  coffee: { label: 'Кофейня', hallRate: 3.5, waiterRatio: 40, dishwasherRatio: 100, guestTime: 25, turnsPerShift: 3.0, hasHall: true, areaPerSeat: [1.5, 1.8], areaPerCook: [4, 5], maxTurnsPerDay: 4 },
+  cafe: { label: 'Кафе', hallRate: 3.2, waiterRatio: 40, dishwasherRatio: 100, guestTime: 35, turnsPerShift: 2.2, hasHall: true, areaPerSeat: [1.8, 2.2], areaPerCook: [5, 6], maxTurnsPerDay: 3 },
+  canteen: { label: 'Столовая', hallRate: 4.5, waiterRatio: 0, dishwasherRatio: 100, guestTime: 20, turnsPerShift: 3.5, hasHall: true, areaPerSeat: [1.8, 2.2], areaPerCook: [5, 6], maxTurnsPerDay: 4 },
+  fastfood: { label: 'Быстрое обслуживание', hallRate: 4.0, waiterRatio: 0, dishwasherRatio: 100, guestTime: 10, turnsPerShift: 4.5, hasHall: true, areaPerSeat: [1.2, 1.5], areaPerCook: [3, 4], maxTurnsPerDay: 5 },
+  darkkitchen: { label: 'Дарк китчен (доставка)', hallRate: 0, waiterRatio: 0, dishwasherRatio: 50, guestTime: 0, turnsPerShift: 0, hasHall: false, areaPerSeat: [0, 0], areaPerCook: [6, 8], maxTurnsPerDay: 0 },
 };
 
 const KITCHEN_TYPE_RATE: Record<string, number> = { hot: 37.5, cold: 17.5, mixed: 27.5 };
@@ -113,6 +118,13 @@ const DISTRICT_RENT_RATES: Record<string, Record<string, [number, number]>> = {
 
 const TARGET_RENT_SHARE: Record<string, [number, number]> = {
   residential: [6, 9], mall: [10, 15], business_center: [8, 12], street: [10, 18],
+};
+
+const LOCATION_DEFAULTS: Record<string, { totalPopulation: number; targetAudiencePercent: number; conversionRate: number }> = {
+  residential: { totalPopulation: 30, targetAudiencePercent: 40, conversionRate: 8 },
+  mall: { totalPopulation: 15, targetAudiencePercent: 15, conversionRate: 5 },
+  business_center: { totalPopulation: 5, targetAudiencePercent: 15, conversionRate: 10 },
+  street: { totalPopulation: 10, targetAudiencePercent: 10, conversionRate: 3 },
 };
 
 /* ============================================================
@@ -214,7 +226,7 @@ function HelpModal({ isOpen, onClose, title, children }: { isOpen: boolean; onCl
 
 /* Collapsible Section */
 function CollapsibleSection({
-  icon: Icon, title, children, helpKey, onHelp, defaultOpen = true, badge,
+  icon: Icon, title, children, helpKey, onHelp, defaultOpen = false, badge,
 }: {
   icon: React.ElementType; title: string; children: React.ReactNode;
   helpKey?: string; onHelp?: (k: string) => void; defaultOpen?: boolean;
@@ -330,12 +342,33 @@ export default function BusinessPage() {
     kitchenType: 'hot', climateZone: -25, indoorTemp: 22, safetyFactor: 1.1, electricityPrice: 5.5, otherPower: 0,
   });
   const [location, setLocation] = useState<LocationSettings>({
-    district: 'central', locationType: 'street', competitors: 10, potentialGuests: 20, competitorInfluence: 0.3,
+    district: 'central',
+    locationType: 'street',
+    competitors: 10,
+    competitorInfluence: 0.3,
+    totalPopulation: 10,
+    targetAudiencePercent: 10,
+    conversionRate: 3,
+    potentialGuests: 0,
   });
 
   const [results, setResults] = useState<any>(null);
   const [helpModal, setHelpModal] = useState<{ block: string; open: boolean }>({ block: '', open: false });
+  const [profitOpen, setProfitOpen] = useState(false);
   const isUpdatingRef = useRef(false);
+
+  const computedPotentialGuests = useCallback((loc: LocationSettings) => {
+    const { totalPopulation, targetAudiencePercent, conversionRate } = loc;
+    const guests = totalPopulation * (targetAudiencePercent / 100) * (conversionRate / 100);
+    return Math.round(guests * 10) / 10;
+  }, []);
+
+  useEffect(() => {
+    const calc = computedPotentialGuests(location);
+    if (Math.abs(location.potentialGuests - calc) > 0.01) {
+      setLocation(prev => ({ ...prev, potentialGuests: calc }));
+    }
+  }, [location.totalPopulation, location.targetAudiencePercent, location.conversionRate, computedPotentialGuests, location.potentialGuests]);
 
   const calculateTheoreticalCheck = useCallback((dishes: Dish[], drinkPrice: number, dishesPerGuest: number, drinksPerGuest: number) => {
     const avgDishPrice = dishes.length > 0 ? dishes.reduce((sum, d) => sum + d.price, 0) / dishes.length : 0;
@@ -428,7 +461,20 @@ export default function BusinessPage() {
     const t = locType ?? location.locationType;
     const rates = DISTRICT_RENT_RATES[d]?.[t];
     if (rates) setHall(prev => ({ ...prev, rentPerSqm: Math.round((rates[0] + rates[1]) / 2) }));
-    setLocation(prev => ({ ...prev, district: d, locationType: t }));
+
+    const locDefaults = LOCATION_DEFAULTS[t];
+    if (locDefaults) {
+      setLocation(prev => ({
+        ...prev,
+        district: d,
+        locationType: t,
+        totalPopulation: locDefaults.totalPopulation,
+        targetAudiencePercent: locDefaults.targetAudiencePercent,
+        conversionRate: locDefaults.conversionRate,
+      }));
+    } else {
+      setLocation(prev => ({ ...prev, district: d, locationType: t }));
+    }
   };
 
   const applyVenueDefaults = (venueType: string) => {
@@ -531,12 +577,23 @@ export default function BusinessPage() {
     const monthlyGuestsModel = realisticGuestsPerShift * shifts * daysOpen;
     const potentialGuestsTotal = location.potentialGuests * 1000;
     const availableMarketFlow = potentialGuestsTotal / (1 + location.competitors * location.competitorInfluence);
-    const marketShare = potentialGuestsTotal > 0 ? (monthlyGuestsModel / potentialGuestsTotal) * 100 : 0;
+    const marketShare = availableMarketFlow > 0 ? (monthlyGuestsModel / availableMarketFlow) * 100 : 0;
     const growthPotential = availableMarketFlow - monthlyGuestsModel;
 
     const revenueCeiling = kitchenRev + coffeeRev;
     const revenueFromGuests = realisticGuestsPerShift * hall.avgCheck;
     const limitingFactor = revenueFromGuests >= revenueCeiling ? 'Кухня/бар' : 'Зал';
+
+    const peakMinutes = PEAK_MINUTES;
+    const peakAvailMin = peakMinutes;
+    const peakKitchenDishes = cooks > 0 ? Math.floor(peakAvailMin * cooks * par / minDishTime) : 0;
+    const peakKitchenGuests = common.avgDishesPerGuest > 0 ? Math.floor(peakKitchenDishes / common.avgDishesPerGuest) : 0;
+    const peakCoffeeDrinks = baristas > 0 ? Math.floor(peakAvailMin * 60 / drinkTime) * baristas : 0;
+    const peakCoffeeGuests = common.avgDrinksPerGuest > 0 ? Math.floor(peakCoffeeDrinks / common.avgDrinksPerGuest) : 0;
+    const peakMaxGuests = Math.min(peakKitchenGuests, peakCoffeeGuests);
+    const peakBottleneck = peakKitchenGuests <= peakCoffeeGuests ? 'Кухня' : 'Бар';
+
+    const maxGuestsPerDayFromSeats = venue.hasHall ? hall.seats * venue.maxTurnsPerDay : common.dailyGuests;
 
     setResults({
       dishRes, totalDishes, kitchenRev, kitchenLoad, kitchenMaxDishes,
@@ -557,6 +614,10 @@ export default function BusinessPage() {
       otherPower: energy.otherPower, otherEnergyCost,
       monthlyGuestsModel, availableMarketFlow, marketShare, growthPotential,
       revenueCeiling, revenueFromGuests, limitingFactor,
+      peakKitchenDishes, peakKitchenGuests,
+      peakCoffeeDrinks, peakCoffeeGuests,
+      peakMaxGuests, peakBottleneck,
+      maxGuestsPerDayFromSeats,
     });
   }, [common, hall, coffee, kitchen, energy, waitersCount, dishwashersCount, location, totalRent, hasHall]);
 
@@ -570,7 +631,12 @@ export default function BusinessPage() {
     kitchen: { title: 'Производительность кухни', text: 'Доступное время = смена × (100% − заготовки).' },
     coffee: { title: 'Кофейня', text: 'Напитков = (доступное время × 60 / время напитка) × бариста.' },
     energy: { title: 'Энергопотребление', text: 'Воздухообмен = площадь × норматив. Тепловая мощность = воздухообмен × ΔT × 0.335 / 1000 × запас. Затраты = мощность × 720 ч × цена кВт·ч.' },
-    location: { title: 'Локация и конкуренция', text: 'Анализ рыночного потенциала и доли аренды.' },
+    location: {
+      title: 'Как оценить аудиторию и конкурентов',
+      text: `Потенциальная аудитория = Общее население/поток × % целевой аудитории × % конверсии в общепит.
+Доступный поток = Потенциальная аудитория / (1 + Конкуренты × Влияние).
+Влияние конкурента: 0.2-0.4 для локальных точек, 0.5-0.8 для сетевых проектов. Чем выше коэффициент, тем сильнее каждый конкурент сокращает ваш доступный рынок.`
+    },
     checkFormula: { title: 'Как формируется средний чек', text: 'Средний чек = (Средняя цена блюда × Блюд на гостя) + (Цена напитка × Напитков на гостя).\n\nИзменение этих параметров автоматически пересчитывает средний чек и наоборот.' },
   };
 
@@ -621,6 +687,19 @@ export default function BusinessPage() {
   const isRentOk = results.totalRent / results.monthlyRevenue <= 0.14;
   const districtLabel = DISTRICTS.find(d => d.value === location.district)?.label || '';
 
+  const staffPerShift = Math.round(results.totalStaff / results.shifts);
+  const staffBadge = `${staffPerShift} чел/см · ${f(results.totalPayrollWithTaxes)} ₽/мес`;
+
+  const maxGuestsFromSeats = results.maxGuestsPerDayFromSeats;
+  const dailyGuestsWarning = common.dailyGuests > maxGuestsFromSeats
+    ? `Превышен теоретический максимум (${maxGuestsFromSeats} гостей/день для ${currentVenue.label.toLowerCase()})`
+    : undefined;
+
+  const profitValue = inputProfit != null ? f(inputProfit) : f(results.monthlyProfit);
+  const profitColor = (inputProfit ?? results.monthlyProfit) > 0 ? 'emerald' : 'rose';
+
+  const venueAddress = dashboard?.name && dashboard?.address ? `${dashboard.name} · ${dashboard.address}` : '';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1400px] mx-auto p-3 sm:p-4 lg:p-6">
@@ -633,53 +712,128 @@ export default function BusinessPage() {
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-gray-900 truncate">Бизнес-аналитика</h1>
             <p className="text-[10px] sm:text-xs text-gray-400 truncate">
-              {dashboard?.name || 'Заведение'}
-              {dashboard?.name && dashboard?.address ? ' · ' : ''}
-              {dashboard?.address || ''}
+              {venueAddress}
             </p>
           </div>
         </div>
 
-        {/* KPI — горизонтальный скролл на мобильном */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible sm:grid sm:grid-cols-5">
-          {[
-            { label: 'Дневная выручка', value: inputDailyRevenue != null ? f(inputDailyRevenue) : f(results.dailyRevenue), sub: inputDailyRevenue != null ? `расчёт: ${f(results.dailyRevenue)} ₽` : 'расчёт модели', color: '' },
-            { label: 'Месячная выручка', value: inputMonthlyRevenue != null ? f(inputMonthlyRevenue) : f(results.monthlyRevenue), sub: inputMonthlyRevenue != null ? `расчёт: ${f(results.monthlyRevenue)} ₽` : undefined, color: '' },
-            { label: 'Прибыль/мес', value: (inputProfit != null ? f(inputProfit) : f(results.monthlyProfit)) + ' ₽', sub: inputProfit == null ? 'не все вводные' : `расчёт: ${f(results.monthlyProfit)} ₽`, color: (inputProfit ?? results.monthlyProfit) > 0 ? 'emerald' : 'rose' },
-            { label: 'Аренда', value: (inputRent != null ? f(inputRent) : f(results.totalRent)) + ' ₽', sub: results.totalRent > 0 && results.monthlyRevenue > 0 ? `${((results.totalRent / results.monthlyRevenue) * 100).toFixed(1)}%` : undefined, color: isRentOk ? 'emerald' : 'amber' },
-            { label: 'Узкое место', value: results.bottleneck, sub: undefined, color: 'amber' },
-          ].map((kpi, i) => (
-            <div
-              key={i}
-              className={cn(
-                'flex-shrink-0 w-[140px] sm:w-auto sm:flex-shrink rounded-xl border p-2.5 sm:p-3',
-                kpi.color === 'emerald' && 'border-emerald-200 bg-emerald-50/50',
-                kpi.color === 'rose' && 'border-red-200 bg-red-50/50',
-                kpi.color === 'amber' && 'border-amber-200 bg-amber-50/50',
-                !kpi.color && 'border-gray-100 bg-white',
-              )}
-            >
-              <div className="text-[10px] font-medium text-gray-400 mb-1">{kpi.label}</div>
-              <div className={cn(
-                'text-sm font-bold tabular-nums',
-                kpi.color === 'emerald' && 'text-emerald-700',
-                kpi.color === 'rose' && 'text-red-600',
-                kpi.color === 'amber' && 'text-amber-700',
-                !kpi.color && 'text-gray-900',
-              )}>{kpi.value}</div>
-              {kpi.sub && <div className="text-[10px] mt-0.5 text-gray-400 truncate">{kpi.sub}</div>}
+        {/* KPI – вертикальный компактный список */}
+        <div className="space-y-2 mb-4">
+          {/* Дневная выручка */}
+          <div className="flex justify-between items-baseline">
+            <span className="text-[10px] font-medium text-gray-400">Дневная выручка</span>
+            <div className="text-right">
+              <span className="text-lg font-bold tabular-nums text-gray-900">
+                {inputDailyRevenue != null ? f(inputDailyRevenue) : f(results.dailyRevenue)} ₽
+              </span>
+              <span className="text-[10px] text-gray-400 ml-2">
+                {inputDailyRevenue != null ? `расчёт: ${f(results.dailyRevenue)} ₽` : 'расчёт модели'}
+              </span>
             </div>
-          ))}
+          </div>
+
+          {/* Месячная выручка */}
+          <div className="flex justify-between items-baseline">
+            <span className="text-[10px] font-medium text-gray-400">Месячная выручка</span>
+            <div className="text-right">
+              <span className="text-lg font-bold tabular-nums text-gray-900">
+                {inputMonthlyRevenue != null ? f(inputMonthlyRevenue) : f(results.monthlyRevenue)} ₽
+              </span>
+              <span className="text-[10px] text-gray-400 ml-2">
+                {inputMonthlyRevenue != null ? `расчёт: ${f(results.monthlyRevenue)} ₽` : '\u00A0'}
+              </span>
+            </div>
+          </div>
+
+          {/* Аренда */}
+          <div className="flex justify-between items-baseline">
+            <span className="text-[10px] font-medium text-gray-400">Аренда</span>
+            <div className="text-right">
+              <span className={cn('text-lg font-bold tabular-nums', isRentOk ? 'text-emerald-700' : 'text-amber-700')}>
+                {inputRent != null ? f(inputRent) : f(results.totalRent)} ₽
+              </span>
+              <span className="text-[10px] text-gray-400 ml-2">
+                {results.totalRent > 0 && results.monthlyRevenue > 0 ? `${((results.totalRent / results.monthlyRevenue) * 100).toFixed(1)}%` : '\u00A0'}
+              </span>
+            </div>
+          </div>
+
+          {/* Узкое место */}
+          <div className="flex justify-between items-baseline">
+            <span className="text-[10px] font-medium text-gray-400">Узкое место</span>
+            <span className="text-lg font-bold text-amber-700">{results.bottleneck}</span>
+          </div>
+
+          {/* Прибыль/мес */}
+          <div>
+            <button
+              onClick={() => setProfitOpen(!profitOpen)}
+              className="w-full flex justify-between items-baseline py-1 focus:outline-none"
+            >
+              <span className="text-[10px] font-medium text-gray-400">Прибыль/мес</span>
+              <div className="flex items-center gap-2">
+                {profitColor === 'emerald' ? (
+                  <CheckCircle size={13} className="text-emerald-600" />
+                ) : (
+                  <AlertTriangle size={13} className="text-red-500" />
+                )}
+                <span className={cn('text-lg font-bold tabular-nums', profitColor === 'emerald' ? 'text-emerald-700' : 'text-rose-600')}>
+                  {profitValue} ₽
+                </span>
+                <ChevronDown size={15} className={cn('text-gray-400 transition-transform', profitOpen && 'rotate-180')} />
+              </div>
+            </button>
+            {profitOpen && (
+              <div className="pl-4 pr-2 py-2 bg-gray-50 rounded-md mt-1">
+                <div className="space-y-1 text-xs">
+                  <ResultRow label="Выручка"
+                    value={inputMonthlyRevenue != null ? f(inputMonthlyRevenue) : f(results.monthlyRevenue)}
+                    sub={inputMonthlyRevenue != null ? `расчёт: ${f(results.monthlyRevenue)} ₽` : ''} />
+                  <ResultRow label="− Аренда"
+                    value={inputRent != null ? `−${f(inputRent)} ₽` : `−${f(results.totalRent)} ₽`}
+                    sub={inputRent != null ? `расчёт: −${f(results.totalRent)} ₽` : ''} />
+                  <ResultRow label="− Коммунальные"
+                    value={inputUtilities != null ? `−${f(inputUtilities)} ₽` : `−${f(results.totalEnergyCost)} ₽`}
+                    sub={inputUtilities != null ? `расчёт: −${f(results.totalEnergyCost)} ₽` : ''} />
+                  <ResultRow label="− ФОТ (с налогами)"
+                    value={inputFOT != null ? `−${f(inputFOT)} ₽` : `−${f(results.totalPayrollWithTaxes)} ₽`}
+                    sub={inputFOT != null ? `расчёт: −${f(results.totalPayrollWithTaxes)} ₽` : ''} />
+                  {inputManagement != null && <ResultRow label="− Управление" value={`−${f(inputManagement)} ₽`} />}
+                  <ResultRow label="− Foodcost"
+                    value={inputCOGS != null ? `−${f(inputCOGS)} ₽` : `−${f(results.totalCOGS)} ₽`}
+                    sub={inputCOGS != null ? `расчёт: −${f(results.totalCOGS)} ₽` : ''} />
+                  {inputOther != null && <ResultRow label="− Прочие" value={`−${f(inputOther)} ₽`} />}
+                  <div className="border-t border-gray-200/50 my-1" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-900">Прибыль</span>
+                    <span className="text-base font-bold tabular-nums" style={{ color: profitColor === 'emerald' ? '#059669' : '#dc2626' }}>
+                      {profitValue} ₽
+                    </span>
+                  </div>
+                  {inputProfit == null && (
+                    <div className="text-right text-[10px] text-amber-500">
+                      Не все вводные — показана модель
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* ОСНОВНОЙ LAYOUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4">
+        {/* ОСНОВНОЙ LAYOUT – теперь всё в одной колонке */}
+        <div className="space-y-3 lg:space-y-4">
 
-          {/* ========== ЛЕВАЯ КОЛОНКА: НАСТРОЙКИ ========== */}
-          <div className="lg:col-span-5 space-y-2 lg:space-y-2.5 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-1">
+          {/* ========== НАСТРОЙКИ ========== */}
+          <div className="space-y-2 lg:space-y-2.5">
 
             {/* 1. Тип и локация */}
-            <CollapsibleSection icon={Building} title="Тип и локация" defaultOpen={false}>
+            <CollapsibleSection
+              icon={Building}
+              title="Тип и локация"
+              defaultOpen={false}
+              badge={venueAddress}
+            >
               <SelectField label="Формат" value={hall.venueType} onChange={applyVenueDefaults}
                 options={Object.entries(VENUE_TYPES).map(([k, v]) => ({ value: k, label: v.label }))} />
               <div className="grid grid-cols-2 gap-2">
@@ -702,31 +856,85 @@ export default function BusinessPage() {
                 />
               </div>
             </CollapsibleSection>
-            {/* 9. Рынок и конкуренция */}
-            <CollapsibleSection icon={MapPin} title="Рынок и конкуренция" helpKey="location" onHelp={openHelp} defaultOpen={false}>
-              <SliderField label="Конкуренты" value={location.competitors} onChange={(v) => setLocation({ ...location, competitors: v })} min={0} max={50} compact />
-              <SliderField label="Потенц. гости" value={location.potentialGuests} onChange={(v) => setLocation({ ...location, potentialGuests: v })} min={1} max={500} step={1} unit="тыс/мес" compact />
-              <SliderField label="Влияние конкур." value={location.competitorInfluence} onChange={(v) => setLocation({ ...location, competitorInfluence: v })} min={0.1} max={1.0} step={0.1} compact
-                hint="Чем выше — тем сильнее конкуренты урезают поток" />
+
+            {/* 2. Рынок и конкуренция */}
+            <CollapsibleSection
+              icon={MapPin}
+              title="Рынок и конкуренция"
+              helpKey="location"
+              onHelp={openHelp}
+              defaultOpen={false}
+              badge={`${location.potentialGuests.toFixed(1)} тыс.`}
+            >
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Общее население / поток (тыс. чел) <span className="text-gray-400">(рекомендовано)</span></label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={location.totalPopulation}
+                    onChange={(e) => setLocation({ ...location, totalPopulation: parseFloat(e.target.value) || 0 })}
+                    className="w-full text-xs rounded-md border border-gray-200 bg-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Целевая аудитория (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={location.targetAudiencePercent}
+                    onChange={(e) => setLocation({ ...location, targetAudiencePercent: parseFloat(e.target.value) || 0 })}
+                    className="w-full text-xs rounded-md border border-gray-200 bg-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Конверсия в посетители (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    value={location.conversionRate}
+                    onChange={(e) => setLocation({ ...location, conversionRate: parseFloat(e.target.value) || 0 })}
+                    className="w-full text-xs rounded-md border border-gray-200 bg-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div className="bg-gray-50 rounded-md p-2 text-xs text-gray-700">
+                  Потенциальная аудитория: <span className="font-bold text-gray-900">{location.potentialGuests.toFixed(1)} тыс. чел/мес</span>
+                </div>
+                <div className="border-t border-gray-100 pt-2">
+                  <SliderField label="Конкуренты" value={location.competitors} onChange={(v) => setLocation({ ...location, competitors: v })} min={0} max={50} compact />
+                  <SliderField label="Влияние конкур." value={location.competitorInfluence} onChange={(v) => setLocation({ ...location, competitorInfluence: v })} min={0.1} max={1.0} step={0.1} compact
+                    hint="Сетевые проекты: 0.5-0.8, локальные: 0.2-0.4" />
+                </div>
+              </div>
             </CollapsibleSection>
 
-            {/* 2. Помещение и аренда */}
-            <CollapsibleSection icon={Gauge} title="Помещение и аренда" defaultOpen={false}>
+            {/* 3. Помещение и аренда */}
+            <CollapsibleSection
+              icon={Gauge}
+              title="Помещение и аренда"
+              defaultOpen={false}
+              badge={`${f(totalRent)} ₽/мес`}
+            >
               <SliderField label="Общая площадь" value={hall.totalArea} onChange={(v) => setHall({ ...hall, totalArea: v })} min={10} max={2000} unit="м²" compact />
               {hasHall && (
                 <SliderField label="Площадь зала" value={hall.hallArea} onChange={(v) => setHall({ ...hall, hallArea: v })} min={1} max={hall.totalArea} unit="м²" compact
                   hint={`Рек: ${results.recommendedHallArea} м²`}
-                  warning={hall.hallArea < results.recommendedHallArea ? 'Меньше нормы' : undefined} />
+                  warning={hall.hallArea < results.recommendedHallArea ? `Плотность рассадки выше нормы для ${currentVenue.label.toLowerCase()}` : undefined} />
               )}
               <SliderField label="Площадь кухни" value={hall.kitchenArea} onChange={(v) => setHall({ ...hall, kitchenArea: v })} min={1} max={hall.totalArea} unit="м²" compact
                 hint={`Рек: ${results.recommendedKitchenArea} м²`}
-                warning={hall.kitchenArea < results.recommendedKitchenArea ? 'Меньше нормы' : undefined} />
+                warning={hall.kitchenArea < results.recommendedKitchenArea ? `Меньше рекомендованной` : undefined} />
               <SliderField label="Аренда (ставка)" value={hall.rentPerSqm} onChange={(v) => setHall({ ...hall, rentPerSqm: v })} min={0} max={20000} step={50} unit="₽/м²" compact
                 hint={`${districtLabel}: ${locationRates[0].toLocaleString()}–${locationRates[1].toLocaleString()} ₽`}
                 warning={isRentRateHigh ? 'Выше рынка' : (isRentRateLow ? 'Ниже рынка' : undefined)} />
             </CollapsibleSection>
 
-            {/* 3. Зал и загрузка (объединено) */}
+            {/* 4. Зал и загрузка */}
             {hasHall && (
               <CollapsibleSection icon={Armchair} title="Зал и загрузка" helpKey="hall" onHelp={openHelp} defaultOpen={false}
                 badge={`${results.realisticGuestsPerShift} чел/см`}>
@@ -736,7 +944,16 @@ export default function BusinessPage() {
                 <SliderField label="Часов в день" value={common.operatingHours} onChange={(v) => setCommon({ ...common, operatingHours: v })} min={1} max={24} step={0.5} unit="ч" compact
                   hint={`${results.shifts} смен(ы)`} />
                 <SliderField label="Смена" value={common.shiftHours} onChange={(v) => setCommon({ ...common, shiftHours: v })} min={1} max={12} step={0.5} unit="ч" compact />
-                <SliderField label="Гостей в день" value={common.dailyGuests} onChange={(v) => setCommon({ ...common, dailyGuests: v })} min={1} max={1000} compact />
+                <SliderField
+                  label="Гостей в день"
+                  value={common.dailyGuests}
+                  onChange={(v) => setCommon({ ...common, dailyGuests: v })}
+                  min={1}
+                  max={maxGuestsFromSeats > 0 ? maxGuestsFromSeats * 2 : 1000}
+                  compact
+                  hint={currentVenue.hasHall ? `Теор. максимум: до ${maxGuestsFromSeats} гостей/день (${currentVenue.maxTurnsPerDay} посадки)` : undefined}
+                  warning={dailyGuestsWarning}
+                />
                 <div className="grid grid-cols-2 gap-2">
                   <SliderField label="Блюд/гость" value={common.avgDishesPerGuest} onChange={handleDishesPerGuestChange} min={0.1} max={3} step={0.1} compact />
                   <SliderField label="Напитков/гость" value={common.avgDrinksPerGuest} onChange={handleDrinksPerGuestChange} min={0.1} max={3} step={0.1} compact />
@@ -744,10 +961,18 @@ export default function BusinessPage() {
               </CollapsibleSection>
             )}
 
-            {/* 4. Персонал (без дублирования поваров/бариста — они в своих секциях) */}
-            <CollapsibleSection icon={Users} title="Персонал" defaultOpen={false}
-              badge={`${results.totalStaff} чел.`}>
+            {/* 5. Персонал (объединённый) */}
+            <CollapsibleSection
+              icon={Users}
+              title="Персонал"
+              defaultOpen={false}
+              badge={staffBadge}
+            >
               <div className="grid grid-cols-2 gap-x-2">
+                <SliderField label="Поваров" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} max={20} compact />
+                <SliderField label="ЗП повара" value={hall.cookSalary} onChange={(v) => setHall({ ...hall, cookSalary: v })} min={0} max={200000} step={1000} unit="₽" compact />
+                <SliderField label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} max={10} compact />
+                <SliderField label="ЗП бариста" value={hall.baristaSalary} onChange={(v) => setHall({ ...hall, baristaSalary: v })} min={0} max={150000} step={1000} unit="₽" compact />
                 {hasHall && (
                   <>
                     <SliderField label="Официанты" value={waitersCount} onChange={(v) => setWaitersCount(v)} min={0} max={20} compact
@@ -759,16 +984,23 @@ export default function BusinessPage() {
                   hint={dishwashersCount > 0 ? `${Math.ceil(hall.hallArea / dishwashersCount)} м²/чел.` : ''} />
                 <SliderField label="ЗП мойщицы" value={hall.dishwasherSalary} onChange={(v) => setHall({ ...hall, dishwasherSalary: v })} min={0} max={100000} step={1000} unit="₽" compact />
               </div>
+              <div className="border-t border-gray-50 my-2" />
+              <SliderField label="Параллельность кухни" value={kitchen.parallelism} onChange={(v) => setKitchen({ ...kitchen, parallelism: v })} min={1} max={10} compact />
+              <SliderField label="Время напитка" value={coffee.drinkTime} onChange={(v) => setCoffee({ ...coffee, drinkTime: v })} min={10} max={300} unit="сек" compact />
             </CollapsibleSection>
 
-            {/* 5. Кухня (меню + повара + зарплаты) */}
-            <CollapsibleSection icon={Flame} title="Кухня" helpKey="kitchen" onHelp={openHelp} defaultOpen={false}
-              badge={`${kitchen.cooks} повара`}>
-              <div className="grid grid-cols-2 gap-x-2">
-                <SliderField label="Поваров" value={kitchen.cooks} onChange={(v) => setKitchen({ ...kitchen, cooks: v })} min={0} max={20} compact />
-                <SliderField label="ЗП повара" value={hall.cookSalary} onChange={(v) => setHall({ ...hall, cookSalary: v })} min={0} max={200000} step={1000} unit="₽" compact />
-              </div>
-              <SliderField label="Параллельность" value={kitchen.parallelism} onChange={(v) => setKitchen({ ...kitchen, parallelism: v })} min={1} max={10} compact />
+            {/* 6. Foodcost (бывшая Себестоимость) */}
+            <CollapsibleSection
+              icon={DollarSign}
+              title="Foodcost"
+              defaultOpen={false}
+              badge={`${f(results.totalCOGS)} ₽`}
+            >
+              <SliderField label="Foodcost блюд %" value={hall.foodCostPercent} onChange={(v) => setHall({ ...hall, foodCostPercent: v })} min={0} max={100} unit="%" compact
+                hint={`Сумма: ${f(results.foodCostAbs)} ₽`} />
+              <SliderField label="Foodcost напитков %" value={hall.drinkCostPercent} onChange={(v) => setHall({ ...hall, drinkCostPercent: v })} min={0} max={100} unit="%" compact
+                hint={`Сумма: ${f(results.drinkCostAbs)} ₽`} />
+
               <div className="border-t border-gray-50 my-2" />
               <div className="text-[10px] font-medium text-gray-400 mb-1.5">Меню</div>
               <div className="space-y-1.5">
@@ -787,29 +1019,11 @@ export default function BusinessPage() {
                   <Plus size={12} /> Добавить
                 </button>
               </div>
-            </CollapsibleSection>
-
-            {/* 6. Кофейня (бариста + параметры) */}
-            <CollapsibleSection icon={Coffee} title="Бар" helpKey="coffee" onHelp={openHelp} defaultOpen={false}
-              badge={`${coffee.baristas} бариста`}>
-              <div className="grid grid-cols-2 gap-x-2">
-                <SliderField label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee({ ...coffee, baristas: v })} min={0} max={10} compact />
-                <SliderField label="ЗП бариста" value={hall.baristaSalary} onChange={(v) => setHall({ ...hall, baristaSalary: v })} min={0} max={150000} step={1000} unit="₽" compact />
-              </div>
-              <SliderField label="Время напитка" value={coffee.drinkTime} onChange={(v) => setCoffee({ ...coffee, drinkTime: v })} min={10} max={300} unit="сек" compact />
+              <div className="border-t border-gray-50 my-2" />
               <SliderField label="Цена напитка" value={coffee.drinkPrice} onChange={updateDrinkPrice} min={50} max={2000} step={10} unit="₽" compact />
             </CollapsibleSection>
 
-            {/* 7. Себестоимость */}
-            <CollapsibleSection icon={DollarSign} title="Себестоимость" defaultOpen={false}
-              badge={`${f(results.totalCOGS)} ₽`}>
-              <SliderField label="Foodcost блюд" value={hall.foodCostPercent} onChange={(v) => setHall({ ...hall, foodCostPercent: v })} min={0} max={100} unit="%" compact
-                hint={`${f(results.foodCostAbs)} ₽`} />
-              <SliderField label="Foodcost напитков" value={hall.drinkCostPercent} onChange={(v) => setHall({ ...hall, drinkCostPercent: v })} min={0} max={100} unit="%" compact
-                hint={`${f(results.drinkCostAbs)} ₽`} />
-            </CollapsibleSection>
-
-            {/* 8. Энергопотребление */}
+            {/* 7. Энергопотребление */}
             <CollapsibleSection icon={Zap} title="Энергопотребление" helpKey="energy" onHelp={openHelp} defaultOpen={false}
               badge={`${f(results.totalEnergyCost)} ₽/мес`}>
               <div className="grid grid-cols-2 gap-2">
@@ -826,60 +1040,13 @@ export default function BusinessPage() {
                 hint="Освещение, холодильники и т.д." />
             </CollapsibleSection>
 
-
-            <div className="h-4" />
           </div>
 
-          {/* ========== ПРАВАЯ КОЛОНКА: РЕЗУЛЬТАТЫ ========== */}
-          <div className="lg:col-span-7 space-y-2.5 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pl-1">
+          {/* ========== РЕЗУЛЬТАТЫ (теперь внизу) ========== */}
+          <div className="space-y-2.5">
 
-            {/* ИТОГОВАЯ ПРИБЫЛЬ */}
-            <div className="rounded-xl border-2 p-3.5 sm:p-4" style={{
-              borderColor: (inputProfit ?? results.monthlyProfit) > 0 ? '#a7f3d0' : '#fecaca',
-              background: (inputProfit ?? results.monthlyProfit) > 0 ? '#f0fdf4' : '#fef2f2',
-            }}>
-              <div className="flex items-center gap-2 mb-2.5">
-                {(inputProfit ?? results.monthlyProfit) > 0
-                  ? <CheckCircle size={16} className="text-emerald-600" />
-                  : <AlertTriangle size={16} className="text-red-500" />
-                }
-                <span className="text-xs font-bold text-gray-900">Итоговая прибыль</span>
-              </div>
-              <div className="space-y-1 text-xs">
-                <ResultRow label="Выручка"
-                  value={inputMonthlyRevenue != null ? f(inputMonthlyRevenue) : f(results.monthlyRevenue)}
-                  sub={inputMonthlyRevenue != null ? `расчёт: ${f(results.monthlyRevenue)} ₽` : ''} />
-                <ResultRow label="− Аренда"
-                  value={inputRent != null ? `−${f(inputRent)} ₽` : `−${f(results.totalRent)} ₽`}
-                  sub={inputRent != null ? `расчёт: −${f(results.totalRent)} ₽` : ''} />
-                <ResultRow label="− Коммунальные"
-                  value={inputUtilities != null ? `−${f(inputUtilities)} ₽` : `−${f(results.totalEnergyCost)} ₽`}
-                  sub={inputUtilities != null ? `расчёт: −${f(results.totalEnergyCost)} ₽` : ''} />
-                <ResultRow label="− ФОТ (с налогами)"
-                  value={inputFOT != null ? `−${f(inputFOT)} ₽` : `−${f(results.totalPayrollWithTaxes)} ₽`}
-                  sub={inputFOT != null ? `расчёт: −${f(results.totalPayrollWithTaxes)} ₽` : ''} />
-                {inputManagement != null && <ResultRow label="− Управление" value={`−${f(inputManagement)} ₽`} />}
-                <ResultRow label="− Foodcost"
-                  value={inputCOGS != null ? `−${f(inputCOGS)} ₽` : `−${f(results.totalCOGS)} ₽`}
-                  sub={inputCOGS != null ? `расчёт: −${f(results.totalCOGS)} ₽` : ''} />
-                {inputOther != null && <ResultRow label="− Прочие" value={`−${f(inputOther)} ₽`} />}
-                <div className="border-t border-gray-200/50 my-1.5" />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-900">Прибыль</span>
-                  <span className="text-base sm:text-lg font-bold tabular-nums" style={{ color: (inputProfit ?? results.monthlyProfit) > 0 ? '#059669' : '#dc2626' }}>
-                    {inputProfit != null ? f(inputProfit) : f(results.monthlyProfit)} ₽
-                  </span>
-                </div>
-                {inputProfit == null && (
-                  <div className="text-right text-[10px] text-amber-500">
-                    Не все вводные — показана модель
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Сводка за смену */}
-            <CollapsibleSection icon={TrendingUp} title="Сводка за смену" helpKey="kpi" onHelp={openHelp} defaultOpen={false}>
+            {/* Максимальные значения по производительности */}
+            <CollapsibleSection icon={TrendingUp} title="Максимальные значения по производительности" helpKey="kpi" onHelp={openHelp} defaultOpen={false}>
               {results.hasHall && (
                 <>
                   <ResultRow label="Гости (загрузка)" value={`${results.realisticGuestsPerShift} чел.`} sub={`в день: ${common.dailyGuests}`} />
@@ -892,108 +1059,38 @@ export default function BusinessPage() {
                 sub={results.requiredDrinks > results.coffeeMaxDrinks ? 'не хватает' : undefined}
                 color={results.requiredDrinks > results.coffeeMaxDrinks ? '#dc2626' : undefined} />
               <div className="border-t border-gray-50 my-1" />
-              <ResultRow label="Выручка/смена" value={`${f(results.shiftRevenue)} ₽`} bold color="#059669" />
               <ResultRow label="Выручка/день" value={`${f(results.dailyRevenue)} ₽`} bold />
               <ResultRow label="Выручка/мес" value={`${f(results.monthlyRevenue)} ₽`} bold />
               <ResultRow label="Потолок выручки" value={`${f(results.revenueCeiling)} ₽`} sub={`лимит: ${results.limitingFactor}`} color="#d97706" />
             </CollapsibleSection>
 
-            {/* ФОТ и штат */}
-            <CollapsibleSection icon={DollarSign} title="ФОТ и штат" defaultOpen={false} badge={`${results.totalStaff} чел.`}>
-              <ResultRow label="Смен" value={`${results.shifts}`} />
-              <ResultRow label="Всего персонала" value={`${results.totalStaff} чел.`} />
-              <div className="border-t border-gray-50 my-1" />
-              <ResultRow label="ФОТ (чистый)" value={`${f(results.totalPayroll)} ₽`} />
-              <ResultRow label="ФОТ + налоги (×1.45)" value={`${f(results.totalPayrollWithTaxes)} ₽`} bold />
-              {inputFOT != null && <ResultRow label="Вводный ФОТ" value={`${f(inputFOT)} ₽`} bold color="#059669" />}
-            </CollapsibleSection>
-
-            {/* Аренда */}
-            <CollapsibleSection icon={Building} title="Аренда" defaultOpen={false}>
-              <ResultRow label="Ставка" value={`${f(hall.rentPerSqm)} ₽/м²`} />
-              <ResultRow label="Площадь" value={`${hall.totalArea} м²`} />
-              <ResultRow label="Аренда/мес" value={`${f(results.totalRent)} ₽`} bold />
-              <div className="border-t border-gray-50 my-1" />
-              {inputRent != null ? (
-                <ResultRow label="Вводная аренда" value={`${f(inputRent)} ₽`} bold color="#059669" />
-              ) : (
-                <>
-                  <ResultRow label="Доля от выручки" value={`${rentShare.toFixed(1)}%`}
-                    sub={`${targetRentShareRange[0]}–${targetRentShareRange[1]}%`}
-                    color={isRentShareOk ? '#059669' : '#dc2626'} />
-                  <p className="text-[10px] mt-1 text-gray-400">
-                    {isRentShareOk ? 'Доля аренды в норме' : 'Доля аренды вне диапазона'}
-                  </p>
-                </>
-              )}
-            </CollapsibleSection>
-
-            {/* Энергопотребление */}
-            <CollapsibleSection icon={Zap} title="Энергопотребление" defaultOpen={false}>
-              <ResultRow label="Воздухообмен зал" value={`${f(results.ventHall)} м³/ч`} />
-              <ResultRow label="Воздухообмен кухня" value={`${f(results.ventKit)} м³/ч`} />
-              <ResultRow label="Итого воздухообмен" value={`${f(results.ventTotal)} м³/ч`} bold />
-              <div className="border-t border-gray-50 my-1" />
-              <ResultRow label="Тепловая мощность" value={`${results.heatTotal.toFixed(1)} кВт`} />
-              <ResultRow label="Отопление/мес" value={`${f(results.monthlyHeatingCost)} ₽`} bold />
-              <ResultRow label="Прочие" value={`${f(results.otherEnergyCost)} ₽`} />
-              <div className="border-t border-gray-50 my-1" />
-              <ResultRow label="Итого энергозатраты" value={`${f(results.totalEnergyCost)} ₽`} bold color="#059669" />
-              {inputUtilities != null && <ResultRow label="Вводные коммунальные" value={`${f(inputUtilities)} ₽`} bold color="#059669" />}
-            </CollapsibleSection>
-
-            {/* Анализ локации */}
-            <CollapsibleSection icon={BarChart3} title="Анализ локации" defaultOpen={false}>
-              <ResultRow label="Доступный поток" value={`${f(results.availableMarketFlow)} гост/мес`} />
-              <ResultRow label="Текущий поток" value={`${f(results.monthlyGuestsModel)} гост/мес`} />
-              <ResultRow label="Потенциал роста" value={`${f(results.growthPotential)} гост/мес`}
-                color={results.growthPotential > 0 ? '#059669' : '#dc2626'} />
-              <div className="border-t border-gray-50 my-1" />
-              <ResultRow label="Доля рынка" value={`${results.marketShare.toFixed(1)}%`} />
-            </CollapsibleSection>
-
-            {/* Детализация кухни */}
-            <CollapsibleSection icon={ChefHat} title="Детализация кухни" defaultOpen={false}
-              badge={`Загрузка ${results.kitchenLoad.toFixed(0)}%`}>
-              <div className="space-y-1.5">
-                {results.dishRes?.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between text-xs py-1 border-b border-gray-50">
-                    <span className="text-gray-500">{d.name}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-gray-400 tabular-nums">{d.time} мин</span>
-                      <span className="font-medium text-gray-800 tabular-nums">{d.maxDishes} шт</span>
-                      <span className="font-semibold text-emerald-600 tabular-nums">{f(d.revenue)} ₽</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-gray-100 my-1.5" />
+            {/* Детализация кухни и бара (объединено, без таблицы блюд) */}
+            <CollapsibleSection icon={ChefHat} title="Детализация кухни и бара" defaultOpen={false}>
               <ResultRow label="Итого кухня" value={`${f(results.kitchenRev)} ₽`} bold color="#059669" />
-              <ResultRow label="Загрузка" value={`${results.kitchenLoad.toFixed(0)}%`}
+              <ResultRow label="Загрузка кухни" value={`${results.kitchenLoad.toFixed(0)}%`}
                 color={results.kitchenLoad > 95 ? '#dc2626' : results.kitchenLoad > 80 ? '#d97706' : '#059669'} />
               {results.kitchenLoad > 95 && (
                 <p className="text-[10px] mt-1.5 p-2 rounded-lg bg-red-50 text-red-600">
-                  Критическая загрузка — риск сбоев
+                  Критическая загрузка кухни — риск сбоев
                 </p>
               )}
+              <div className="border-t border-gray-100 my-1.5" />
+              <ResultRow label="Макс. напитков бар" value={`${results.coffeeMaxDrinks}`} />
+              <ResultRow label="Выручка бара" value={`${f(results.coffeeRev)} ₽`} bold color="#059669" />
+              <div className="border-t border-gray-100 my-1.5" />
+              <div className="text-[10px] font-medium text-gray-400 mb-1">Пиковая мощность (за {PEAK_MINUTES} мин)</div>
+              <ResultRow label="Макс. блюд" value={`${results.peakKitchenDishes}`} />
+              <ResultRow label="Макс. гостей по кухне" value={`${results.peakKitchenGuests}`} sub={`(${common.avgDishesPerGuest} бл./гость)`} />
+              <ResultRow label="Макс. напитков бар" value={`${results.peakCoffeeDrinks}`} />
+              <ResultRow label="Макс. гостей по бару" value={`${results.peakCoffeeGuests}`} sub={`(${common.avgDrinksPerGuest} нап./гость)`} />
+              <div className="border-t border-gray-100 my-1.5" />
+              <ResultRow label="Максимум гостей за пик" value={`${results.peakMaxGuests}`} bold color="#059669" />
+              <ResultRow label="Ограничивает" value={results.peakBottleneck} />
+              <p className="text-[10px] mt-1 text-gray-400">
+                При текущем меню и персонале за {PEAK_MINUTES} минут можно обслужить не более {results.peakMaxGuests} гостей.
+              </p>
             </CollapsibleSection>
 
-            {/* Детализация кофейни */}
-            <CollapsibleSection icon={Coffee} title="Детализация кофейни" defaultOpen={false}>
-              <ResultRow label="Макс. напитков" value={`${results.coffeeMaxDrinks}`} />
-              <ResultRow label="Выручка кофейни" value={`${f(results.coffeeRev)} ₽`} bold color="#059669" />
-            </CollapsibleSection>
-
-            {/* Foodcost расчёт */}
-            <CollapsibleSection icon={DollarSign} title="Foodcost (расчёт)" defaultOpen={false}>
-              <ResultRow label="Блюда" value={`${f(results.foodCostAbs)} ₽`} sub={`${hall.foodCostPercent}%`} />
-              <ResultRow label="Напитки" value={`${f(results.drinkCostAbs)} ₽`} sub={`${hall.drinkCostPercent}%`} />
-              <div className="border-t border-gray-50 my-1" />
-              <ResultRow label="Итого foodcost" value={`${f(results.totalCOGS)} ₽`} bold />
-              {inputCOGS != null && <ResultRow label="Вводный foodcost" value={`${f(inputCOGS)} ₽`} bold color="#059669" />}
-            </CollapsibleSection>
-
-            <div className="h-4" />
           </div>
         </div>
 

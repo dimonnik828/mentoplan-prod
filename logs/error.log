@@ -13,3 +13,8 @@
 {"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:32.395Z"}
 {"error":{},"level":"error","message":"[API GET] http://localhost:3000/api/analytics","timestamp":"2026-07-14T13:47:35.413Z"}
 {"error":{"clientVersion":"6.19.3","name":"PrismaClientValidationError"},"level":"error","message":"[API GET] http://localhost:3000/api/admin/analytics/page-metrics","timestamp":"2026-07-14T15:06:54.365Z"}
+{"error":{"clientVersion":"6.19.3","name":"PrismaClientValidationError"},"level":"error","message":"[API POST] http://localhost:3000/api/analyze","timestamp":"2026-07-15T08:57:32.116Z"}
+{"error":{"clientVersion":"6.19.3","name":"PrismaClientValidationError"},"level":"error","message":"[API POST] http://localhost:3000/api/analyze","timestamp":"2026-07-15T09:00:41.577Z"}
+{"error":{"clientVersion":"6.19.3","name":"PrismaClientValidationError"},"level":"error","message":"[API POST] http://localhost:3000/api/analyze","timestamp":"2026-07-15T09:06:38.936Z"}
+{"error":{"clientVersion":"6.19.3","name":"PrismaClientValidationError"},"level":"error","message":"[API POST] http://localhost:3000/api/analyze","timestamp":"2026-07-15T09:12:26.592Z"}
+{"error":{"clientVersion":"6.19.3","name":"PrismaClientUnknownRequestError"},"level":"error","message":"[API POST] http://localhost:3000/api/analyze","timestamp":"2026-07-15T09:54:02.372Z"}

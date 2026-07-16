@@ -40,6 +40,7 @@ export const analyzeSchema = z.object({
   managementCosts: nonNegativeNumber(100_000_000),
   costOfGoods: nonNegativeNumber(1_000_000_000),
   otherExpenses: nonNegativeNumber(100_000_000),
+  price: z.number().optional(), // поле, которое может приходить от дашборда
 });
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ export const auditCreateSchema = z.object({
   managementCosts: nonNegativeNumber(100_000_000),
   costOfGoods: nonNegativeNumber(1_000_000_000),
   otherExpenses: nonNegativeNumber(100_000_000),
+  price: z.number().optional(),
 });
 
 // ---------------------------------------------------------------------------
