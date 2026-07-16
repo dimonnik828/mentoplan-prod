@@ -1,7 +1,6 @@
-// app/components/DashboardClient.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CheckCircle,
   Edit,
@@ -9,11 +8,46 @@ import {
   TrendingDown,
   AlertTriangle,
   Info,
+  Wallet,
+  PiggyBank,
+  UtensilsCrossed,
+  Users,
+  Building2,
+  ChefHat,
+  Lightbulb,
+  CircleDot,
 } from 'lucide-react';
-import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Skeleton, SkeletonCard } from '../../components/Skeleton';
+import { toast } from 'sonner';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
-// ---- Типы ----
+/* ==================================================================
+   ТИПЫ
+   ================================================================== */
+
 type BusinessData = {
   name: string;
   address: string;
@@ -22,7 +56,7 @@ type BusinessData = {
   hallArea: number;
   seats: number;
   staffCount: number;
-  dailyGuests: number; // новое поле
+  dailyGuests: number;
   avgCheck: number;
   revenue: number;
   rent: number;
@@ -42,7 +76,10 @@ type BusinessData = {
   healthIndex: number;
 };
 
-// ---- Данные по умолчанию ----
+/* ==================================================================
+   ДАННЫЕ ПО УМОЛЧАНИЮ
+   ================================================================== */
+
 const defaultBusiness: BusinessData = {
   name: 'Кафе MOMENTO на Тверской',
   address: 'Москва, ул. Тверская, 10',
@@ -51,7 +88,7 @@ const defaultBusiness: BusinessData = {
   hallArea: 80,
   seats: 48,
   staffCount: 12,
-  dailyGuests: 50, // начальное значение
+  dailyGuests: 50,
   avgCheck: 1050,
   revenue: 3200000,
   rent: 576000,
@@ -71,10 +108,26 @@ const defaultBusiness: BusinessData = {
   healthIndex: 62,
 };
 
+/* ==================================================================
+   УТИЛИТЫ
+   ================================================================== */
+
 const formatPercent = (value: number): string => value.toFixed(2);
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
 
-// Нормы для цветовой индикации
+const VENUE_LABELS: Record<string, string> = {
+  cafe: 'Кафе',
+  restaurant: 'Ресторан',
+  coffee: 'Кофейня',
+  canteen: 'Столовая',
+  fastfood: 'Быстрое обслуживание',
+  darkkitchen: 'Дарк-китчен',
+};
+
+/* ==================================================================
+   НОРМЫ И ЦВЕТА
+   ================================================================== */
+
 const NORMS: Record<string, { green: number; orange: number; red: number; higherIsBetter?: boolean }> = {
   foodCostPercent: { green: 32, orange: 38, red: 38 },
   payrollPercent: { green: 25, orange: 30, red: 30 },
@@ -97,6 +150,10 @@ const getColorLevel = (key: string, value: number): { color: ColorLevel; css: st
     return { color: 'red', css: '#ef4444' };
   }
 };
+
+/* ==================================================================
+   ПЕРЕСЧЁТ БИЗНЕС-ДАННЫХ
+   ================================================================== */
 
 const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const revenue = data.revenue ?? defaultBusiness.revenue;
@@ -152,140 +209,342 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   };
 };
 
-const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'info'; onClose: () => void }) => {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-  return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium"
-      style={{ background: type === 'success' ? 'var(--success)' : 'var(--primary)' }}>
-      {type === 'success' ? <CheckCircle size={18} /> : <Info size={18} />}
-      <span>{message}</span>
-      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 transition">×</button>
-    </div>
-  );
+/* ==================================================================
+   ЦВЕТОВЫЕ МАППИНГИ ДЛЯ UI
+   ================================================================== */
+
+const levelBorder: Record<ColorLevel, string> = {
+  green: 'border-l-emerald-500',
+  orange: 'border-l-amber-500',
+  red: 'border-l-red-500',
+  neutral: 'border-l-slate-300',
 };
 
-const MetricRow = ({ label, value, unit = '%', target, colorLevel }: {
-  label: string; value: number; unit?: string; target?: string; colorLevel: ColorLevel;
-}) => {
-  const cssColor = colorLevel === 'green' ? '#10b981' : colorLevel === 'orange' ? '#f59e0b' : colorLevel === 'red' ? '#ef4444' : '#6b7280';
+const levelText: Record<ColorLevel, string> = {
+  green: 'text-emerald-600',
+  orange: 'text-amber-600',
+  red: 'text-red-600',
+  neutral: 'text-slate-900',
+};
+
+const levelBg: Record<ColorLevel, string> = {
+  green: 'bg-emerald-50',
+  orange: 'bg-amber-50',
+  red: 'bg-red-50',
+  neutral: 'bg-slate-50',
+};
+
+const levelBar: Record<ColorLevel, string> = {
+  green: 'bg-emerald-500',
+  orange: 'bg-amber-500',
+  red: 'bg-red-500',
+  neutral: 'bg-slate-300',
+};
+
+const levelIconBg: Record<ColorLevel, string> = {
+  green: 'bg-emerald-100 text-emerald-600',
+  orange: 'bg-amber-100 text-amber-600',
+  red: 'bg-red-100 text-red-600',
+  neutral: 'bg-slate-100 text-slate-500',
+};
+
+const levelBadge: Record<ColorLevel, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  green: 'secondary',
+  orange: 'secondary',
+  red: 'destructive',
+  neutral: 'outline',
+};
+
+/* ==================================================================
+   ПОДКОМПОНЕНТЫ
+   ================================================================== */
+
+function ExpenseBar({
+  label,
+  value,
+  target,
+  colorLevel,
+}: {
+  label: string;
+  value: number;
+  target?: string;
+  colorLevel: ColorLevel;
+}) {
+  const barWidth = Math.min((value / 45) * 100, 100);
   return (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cssColor }} />
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+    <div className="flex items-center gap-3 py-2">
+      <span className="text-sm text-muted-foreground w-28 shrink-0 truncate">{label}</span>
+      <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-500', levelBar[colorLevel])}
+          style={{ width: `${barWidth}%` }}
+        />
       </div>
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold tabular-nums" style={{ color: cssColor }}>
-          {unit === '₽' ? fmt(value) + ' ₽' : `${formatPercent(value)}%`}
+      <span className={cn('text-sm font-semibold tabular-nums w-14 text-right', levelText[colorLevel])}>
+        {formatPercent(value)}%
+      </span>
+      {target && (
+        <span className="text-[11px] text-muted-foreground w-20 text-right hidden sm:block">
+          {target}
         </span>
-        {target && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{target}</span>}
+      )}
+    </div>
+  );
+}
+
+function KPICard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  colorLevel,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  sub: string;
+  colorLevel: ColorLevel;
+}) {
+  return (
+    <Card className={cn('border-l-4 overflow-hidden', levelBorder[colorLevel], 'py-0 gap-0')}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
+            <p className={cn('text-xl font-bold tabular-nums leading-tight', levelText[colorLevel])}>
+              {value}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">{sub}</p>
+          </div>
+          <div className={cn('p-2 rounded-lg shrink-0', levelIconBg[colorLevel])}>
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function VenueInfoChip({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+      <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+        <p className="text-sm font-semibold text-foreground leading-tight tabular-nums">{value}</p>
       </div>
     </div>
   );
-};
+}
 
-const DataModal = ({ isOpen, onClose, data, onSave }: {
-  isOpen: boolean; onClose: () => void; data: BusinessData; onSave: (newData: Partial<BusinessData>) => void;
-}) => {
-  const [form, setForm] = useState(data);
-  useEffect(() => { setForm(data); }, [data, isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value === '' ? 0 : Number(value) }));
-  };
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-  };
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(form); onClose(); };
-  if (!isOpen) return null;
-
-  const fields = [
-    { name: 'totalArea', label: 'Площадь общая (м²)' },
-    { name: 'hallArea', label: 'Площадь зала (м²)' },
-    { name: 'seats', label: 'Посадочных мест' },
-    { name: 'staffCount', label: 'Количество сотрудников' },
-    { name: 'dailyGuests', label: 'Гостей в день (среднее)' },
-    { name: 'revenue', label: 'Выручка в месяц (₽)' },
-    { name: 'avgCheck', label: 'Средний чек (₽)' },
-    { name: 'rent', label: 'Аренда (₽)' },
-    { name: 'utilities', label: 'Коммунальные платежи (₽)' },
-    { name: 'payroll', label: 'ФОТ (₽)' },
-    { name: 'managementCosts', label: 'Затраты на управление (₽)' },
-    { name: 'costOfGoods', label: 'Foodcost (₽)' },
-    { name: 'otherExpenses', label: 'Прочие расходы (₽)' },
-  ];
+function Recommendation({
+  colorLevel,
+  title,
+  value,
+  description,
+}: {
+  colorLevel: ColorLevel;
+  title: string;
+  value: string;
+  description: string;
+}) {
+  const IconComponent =
+    colorLevel === 'green' ? CheckCircle
+    : colorLevel === 'orange' ? AlertTriangle
+    : colorLevel === 'red' ? AlertTriangle
+    : Info;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col" style={{ boxShadow: 'var(--shadow-modal)' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Вводные данные бизнеса</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition" style={{ color: 'var(--text-muted)' }}>✕</button>
+    <div className={cn('flex gap-3 p-3 rounded-lg', levelBg[colorLevel])}>
+      <IconComponent className={cn('h-4 w-4 shrink-0 mt-0.5', levelText[colorLevel])} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+          <span className="text-sm font-medium text-foreground">{title}</span>
+          <Badge variant={levelBadge[colorLevel]} className="text-[10px] px-1.5 py-0">
+            {value}
+          </Badge>
         </div>
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="space-y-5">
-            <div>
-              <label className="section-label block">Основная информация</label>
-              <input type="text" name="name" value={form.name} onChange={handleTextChange} className="input-field mb-3" placeholder="Название" />
-              <input type="text" name="address" value={form.address} onChange={handleTextChange} className="input-field mb-3" placeholder="Адрес" />
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Тип заведения</label>
-              <select name="venueType" value={form.venueType} onChange={handleSelectChange} className="input-field">
-                <option value="cafe">Кафе</option>
-                <option value="restaurant">Ресторан</option>
-                <option value="coffee">Кофейня</option>
-                <option value="canteen">Столовая</option>
-                <option value="fastfood">Быстрое обслуживание</option>
-                <option value="darkkitchen">Дарк китчен</option>
-              </select>
-            </div>
-            <div>
-              <label className="section-label block">Площади и ресурсы</label>
-              <div className="grid grid-cols-2 gap-3">
-                {fields.slice(0, 5).map(f => (
-                  <div key={f.name}>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
-                    <input type="number" name={f.name} value={form[f.name as keyof BusinessData] as number} onChange={handleChange} className="input-field" />
+        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 max-w-[1200px] mx-auto space-y-6">
+      <div className="flex items-start justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-9 w-36" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 rounded-lg" />
+        ))}
+      </div>
+      <Skeleton className="h-72 rounded-xl" />
+      <Skeleton className="h-64 rounded-xl" />
+    </div>
+  );
+}
+
+/* ==================================================================
+   МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ
+   ================================================================== */
+
+const FORM_FIELDS = [
+  { section: 'Основная информация', fields: ['name', 'address', 'venueType'] },
+  { section: 'Площади и ресурсы', fields: ['totalArea', 'hallArea', 'seats', 'staffCount', 'dailyGuests'] },
+  { section: 'Финансы (₽/мес)', fields: ['revenue', 'avgCheck', 'rent', 'utilities', 'payroll', 'managementCosts', 'costOfGoods', 'otherExpenses'] },
+] as const;
+
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Название',
+  address: 'Адрес',
+  venueType: 'Тип заведения',
+  totalArea: 'Площадь общая (м²)',
+  hallArea: 'Площадь зала (м²)',
+  seats: 'Посадочных мест',
+  staffCount: 'Сотрудников',
+  dailyGuests: 'Гостей в день (среднее)',
+  revenue: 'Выручка в месяц',
+  avgCheck: 'Средний чек',
+  rent: 'Аренда',
+  utilities: 'Коммунальные платежи',
+  payroll: 'ФОТ',
+  managementCosts: 'Затраты на управление',
+  costOfGoods: 'Foodcost',
+  otherExpenses: 'Прочие расходы',
+};
+
+function DataModal({
+  open,
+  onOpenChange,
+  data,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  data: BusinessData;
+  onSave: (newData: Partial<BusinessData>) => void;
+}) {
+  const [form, setForm] = useState<Record<string, string | number>>({});
+
+  const handleOpenChange = useCallback(
+    (v: boolean) => {
+      if (v) setForm({ ...data });
+      onOpenChange(v);
+    },
+    [data, onOpenChange]
+  );
+
+  const set = (key: string, val: string | number) =>
+    setForm((prev) => ({ ...prev, [key]: val }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(form as Partial<BusinessData>);
+    handleOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-0">
+          <DialogTitle>Вводные данные бизнеса</DialogTitle>
+          <DialogDescription>Измените параметры для пересчёта показателей</DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-6">
+            {FORM_FIELDS.map((section) => (
+              <div key={section.section}>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  {section.section}
+                </h3>
+
+                {section.section === 'Основная информация' ? (
+                  <div className="space-y-3">
+                    {section.fields.map((f) =>
+                      f === 'venueType' ? (
+                        <div key={f} className="space-y-1.5">
+                          <Label>{FIELD_LABELS[f]}</Label>
+                          <Select
+                            value={String(form[f] ?? '')}
+                            onValueChange={(v) => set(f, v)}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(VENUE_LABELS).map(([k, v]) => (
+                                <SelectItem key={k} value={k}>
+                                  {v}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div key={f} className="space-y-1.5">
+                          <Label>{FIELD_LABELS[f]}</Label>
+                          <Input
+                            type="text"
+                            value={String(form[f] ?? '')}
+                            onChange={(e) => set(f, e.target.value)}
+                          />
+                        </div>
+                      )
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="section-label block">Финансы (₽/мес)</label>
-              <div className="grid grid-cols-2 gap-3">
-                {fields.slice(5).map(f => (
-                  <div key={f.name}>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
-                    <input type="number" name={f.name} value={form[f.name as keyof BusinessData] as number} onChange={handleChange} className="input-field" />
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {section.fields.map((f) => (
+                      <div key={f} className="space-y-1.5">
+                        <Label>{FIELD_LABELS[f]}</Label>
+                        <Input
+                          type="number"
+                          value={Number(form[f] ?? 0) || ''}
+                          onChange={(e) => set(f, e.target.value === '' ? 0 : Number(e.target.value))}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
+            ))}
           </div>
         </form>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
-          <button type="button" onClick={onClose} className="btn-ghost">Отмена</button>
-          <button type="submit" onClick={handleSubmit} className="btn-primary">Сохранить</button>
-        </div>
-      </div>
-    </div>
+
+        <DialogFooter className="px-6 py-4 border-t">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Отмена
+          </Button>
+          <Button type="submit" onClick={handleSubmit}>
+            Сохранить
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-};
+}
+
+/* ==================================================================
+   ОСНОВНОЙ КОМПОНЕНТ
+   ================================================================== */
 
 export default function DashboardClient() {
   const [businessData, setBusinessData] = useState<BusinessData>(defaultBusiness);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -356,108 +615,247 @@ export default function DashboardClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      setToast({ message: 'Данные сохранены', type: 'success' });
+      toast.success('Данные сохранены');
     } catch {
-      setToast({ message: 'Ошибка соединения', type: 'info' });
+      toast.error('Ошибка соединения с сервером');
     }
   };
 
-  const kpis = [
-    { label: 'Выручка/мес', value: `${fmt(businessData.revenue)} ₽`, sub: `Чек: ${fmt(businessData.avgCheck)} ₽` },
-    {
-      label: 'Операционная прибыль',
+  const kpis = useMemo(
+    () => [
+      {
+        icon: Wallet,
+        label: 'Выручка/мес',
+        value: `${fmt(businessData.revenue)} ₽`,
+        sub: `Чек: ${fmt(businessData.avgCheck)} ₽`,
+        colorLevel: 'neutral' as ColorLevel,
+      },
+      {
+        icon: PiggyBank,
+        label: 'Операционная прибыль',
+        value: `${formatPercent(businessData.profitPercent)}%`,
+        sub: `${fmt(businessData.operatingProfit)} ₽`,
+        colorLevel: getColorLevel('profitPercent', businessData.profitPercent).color,
+      },
+      {
+        icon: UtensilsCrossed,
+        label: 'Food cost',
+        value: `${formatPercent(businessData.foodCostPercent)}%`,
+        sub: businessData.foodCostPercent > 32 ? 'Выше нормы' : 'В норме',
+        colorLevel: getColorLevel('foodCostPercent', businessData.foodCostPercent).color,
+      },
+      {
+        icon: Users,
+        label: 'ФОТ',
+        value: `${formatPercent(businessData.payrollPercent)}%`,
+        sub: businessData.payrollPercent > 25 ? 'Выше нормы' : 'В норме',
+        colorLevel: getColorLevel('payrollPercent', businessData.payrollPercent).color,
+      },
+    ],
+    [businessData]
+  );
+
+  const recommendations = useMemo(() => {
+    const items: {
+      colorLevel: ColorLevel;
+      title: string;
+      value: string;
+      description: string;
+    }[] = [];
+
+    const profitLevel = getColorLevel('profitPercent', businessData.profitPercent).color;
+    items.push({
+      colorLevel: profitLevel,
+      title: 'Операционная прибыль',
       value: `${formatPercent(businessData.profitPercent)}%`,
-      sub: `${fmt(businessData.operatingProfit)} ₽`,
-      colorLevel: getColorLevel('profitPercent', businessData.profitPercent).color,
-    },
-    {
-      label: 'Food cost',
+      description:
+        profitLevel === 'green'
+          ? 'Прибыль находится в целевом диапазоне. Продолжайте контролировать расходы.'
+          : profitLevel === 'orange'
+            ? `Прибыль ниже целевого уровня 15%. Рекомендуется сократить расходы примерно на ${fmt(Math.round(businessData.revenue * 0.05))} ₽/мес.`
+            : `Прибыль значительно ниже нормы 15%. Необходимо сократить расходы минимум на ${fmt(Math.round(businessData.revenue * 0.1))} ₽/мес для выхода в зелёную зону.`,
+    });
+
+    const fcLevel = getColorLevel('foodCostPercent', businessData.foodCostPercent).color;
+    items.push({
+      colorLevel: fcLevel,
+      title: 'Food cost',
       value: `${formatPercent(businessData.foodCostPercent)}%`,
-      sub: businessData.foodCostPercent > 32 ? 'Выше нормы' : 'В норме',
-      colorLevel: getColorLevel('foodCostPercent', businessData.foodCostPercent).color,
-    },
-    {
-      label: 'ФОТ',
+      description:
+        fcLevel === 'green'
+          ? 'Себестоимость блюд в норме.'
+          : `Себестоимость ${formatPercent(businessData.foodCostPercent)}% при норме 28–32%. Снижение на 2% сэкономит ${fmt(Math.round(businessData.revenue * 0.02))} ₽/мес.`,
+    });
+
+    const prLevel = getColorLevel('payrollPercent', businessData.payrollPercent).color;
+    items.push({
+      colorLevel: prLevel,
+      title: 'Фонд оплаты труда',
       value: `${formatPercent(businessData.payrollPercent)}%`,
-      sub: businessData.payrollPercent > 25 ? 'Выше нормы' : 'В норме',
-      colorLevel: getColorLevel('payrollPercent', businessData.payrollPercent).color,
-    },
-  ];
+      description:
+        prLevel === 'green'
+          ? 'ФОТ в пределах нормы.'
+          : `ФОТ ${formatPercent(businessData.payrollPercent)}% при норме 22–25%. Оптимизация графиков на 2% сэкономит ${fmt(Math.round(businessData.revenue * 0.02))} ₽/мес.`,
+    });
+
+    const rnLevel = getColorLevel('rentPercent', businessData.rentPercent).color;
+    items.push({
+      colorLevel: rnLevel,
+      title: 'Арендная нагрузка',
+      value: `${formatPercent(businessData.rentPercent)}%`,
+      description:
+        rnLevel === 'green'
+          ? 'Аренда в допустимых пределах.'
+          : `Аренда ${formatPercent(businessData.rentPercent)}% при норме до 14%. Рассмотрите переговоры с арендодателем или увеличение выручки.`,
+    });
+
+    return items;
+  }, [businessData]);
+
+  const healthColor =
+    businessData.healthIndex >= 70
+      ? 'bg-emerald-500'
+      : businessData.healthIndex >= 40
+        ? 'bg-amber-500'
+        : 'bg-red-500';
 
   if (loading) {
     return (
       <ErrorBoundary>
-        <div className="p-6 lg:p-8" style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {[...Array(4)].map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        </div>
+        <DashboardSkeleton />
       </ErrorBoundary>
     );
   }
 
   return (
     <ErrorBoundary>
-      <div className="p-6 lg:p-8" style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>{businessData.name}</h1>
-            <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {businessData.address} · Гостей в день: {businessData.dailyGuests}
+      <div className="p-6 lg:p-8 max-w-[1200px] mx-auto">
+        {/* ---- Шапка ---- */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-foreground truncate">
+              {businessData.name}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5 truncate">
+              {businessData.address}
+              <span className="mx-1.5 opacity-40">·</span>
+              {VENUE_LABELS[businessData.venueType] ?? businessData.venueType}
             </p>
           </div>
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary"><Edit size={16} /> Изменить данные</button>
+          <Button onClick={() => setIsModalOpen(true)} size="sm">
+            <Edit className="h-4 w-4" />
+            Изменить данные
+          </Button>
         </div>
 
+        {/* ---- Инфо-плашки заведения ---- */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+          <VenueInfoChip icon={Building2} label="Общая площадь" value={`${businessData.totalArea} м²`} />
+          <VenueInfoChip icon={Building2} label="Зал" value={`${businessData.hallArea} м²`} />
+          <VenueInfoChip icon={Users} label="Места" value={businessData.seats} />
+          <VenueInfoChip icon={ChefHat} label="Персонал" value={businessData.staffCount} />
+          <VenueInfoChip icon={TrendingUp} label="Гостей/день" value={businessData.dailyGuests} />
+        </div>
+
+        {/* ---- KPI-карточки ---- */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {kpis.map((kpi, i) => (
-            <div key={i} className="card p-4 bg-white rounded-xl border border-gray-100">
-              <div className="text-xs font-medium text-gray-400 mb-1">{kpi.label}</div>
-              <div className={`text-lg font-bold tabular-nums ${kpi.colorLevel === 'green' ? 'text-emerald-600' : kpi.colorLevel === 'orange' ? 'text-amber-600' : kpi.colorLevel === 'red' ? 'text-red-600' : 'text-gray-900'}`}>
-                {kpi.value}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">{kpi.sub}</div>
-            </div>
+          {kpis.map((kpi) => (
+            <KPICard key={kpi.label} {...kpi} />
           ))}
         </div>
 
-        <div className="card p-5 mb-6">
-          <div className="section-label">На что уходит выручка</div>
-          <MetricRow label="Foodcost" value={businessData.foodCostPercent} target="→ 28–32%" colorLevel={getColorLevel('foodCostPercent', businessData.foodCostPercent).color} />
-          <MetricRow label="ФОТ" value={businessData.payrollPercent} target="→ 22–25%" colorLevel={getColorLevel('payrollPercent', businessData.payrollPercent).color} />
-          <MetricRow label="Аренда" value={businessData.rentPercent} target="→ до 14%" colorLevel={getColorLevel('rentPercent', businessData.rentPercent).color} />
-          <MetricRow label="Коммунальные" value={businessData.utilitiesPercent} colorLevel="neutral" />
-          <MetricRow label="Управление" value={businessData.managementPercent} colorLevel="neutral" />
-          <MetricRow label="Прочие" value={businessData.otherPercent} colorLevel="neutral" />
-          <div className="divider" />
-          <MetricRow label="Операционная прибыль" value={businessData.profitPercent} target="→ 15%+" colorLevel={getColorLevel('profitPercent', businessData.profitPercent).color} />
-          <div className="mt-4 pt-3 border-t border-gray-100">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-gray-700">Индекс здоровья</span>
-              <div className="flex items-center gap-2">
-                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${businessData.healthIndex}%`, backgroundColor: businessData.healthIndex >= 70 ? '#10b981' : businessData.healthIndex >= 40 ? '#f59e0b' : '#ef4444' }} />
-                </div>
-                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{businessData.healthIndex}%</span>
+        {/* ---- Структура выручки ---- */}
+        <Card className="mb-6 py-0 gap-0">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-sm font-semibold">Структура выручки</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <ExpenseBar
+              label="Foodcost"
+              value={businessData.foodCostPercent}
+              target="→ 28–32%"
+              colorLevel={getColorLevel('foodCostPercent', businessData.foodCostPercent).color}
+            />
+            <ExpenseBar
+              label="ФОТ"
+              value={businessData.payrollPercent}
+              target="→ 22–25%"
+              colorLevel={getColorLevel('payrollPercent', businessData.payrollPercent).color}
+            />
+            <ExpenseBar
+              label="Аренда"
+              value={businessData.rentPercent}
+              target="→ до 14%"
+              colorLevel={getColorLevel('rentPercent', businessData.rentPercent).color}
+            />
+            <ExpenseBar
+              label="Коммунальные"
+              value={businessData.utilitiesPercent}
+              colorLevel="neutral"
+            />
+            <ExpenseBar
+              label="Управление"
+              value={businessData.managementPercent}
+              colorLevel="neutral"
+            />
+            <ExpenseBar
+              label="Прочие"
+              value={businessData.otherPercent}
+              colorLevel="neutral"
+            />
+            <Separator className="my-2" />
+            <ExpenseBar
+              label="Опер. прибыль"
+              value={businessData.profitPercent}
+              target="→ 15%+"
+              colorLevel={getColorLevel('profitPercent', businessData.profitPercent).color}
+            />
+
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="font-medium text-foreground">Индекс здоровья бизнеса</span>
+                <span className="font-bold tabular-nums text-foreground">
+                  {businessData.healthIndex}%
+                </span>
               </div>
+              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-500', healthColor)}
+                  style={{ width: `${businessData.healthIndex}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                {businessData.healthIndex >= 70
+                  ? 'Бизнес в хорошей форме'
+                  : businessData.healthIndex >= 40
+                    ? 'Есть точки для улучшения'
+                    : 'Требуется внимание к ключевым метрикам'}
+              </p>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="card p-5">
-          <div className="section-label">Экспресс-аудит</div>
-          <div className="space-y-3 mt-3">
-            <MetricRow label="Foodcost" value={businessData.foodCostPercent} target="→ 28–32%" colorLevel={getColorLevel('foodCostPercent', businessData.foodCostPercent).color} />
-            <MetricRow label="ФОТ" value={businessData.payrollPercent} target="→ 22–25%" colorLevel={getColorLevel('payrollPercent', businessData.payrollPercent).color} />
-            <MetricRow label="Аренда" value={businessData.rentPercent} target="→ до 14%" colorLevel={getColorLevel('rentPercent', businessData.rentPercent).color} />
-            <MetricRow label="Прибыль" value={businessData.profitPercent} target="→ 15%+" colorLevel={getColorLevel('profitPercent', businessData.profitPercent).color} />
-          </div>
-        </div>
+        {/* ---- Рекомендации ---- */}
+        <Card className="py-0 gap-0">
+          <CardHeader className="pb-0">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-amber-500" />
+              <CardTitle className="text-sm font-semibold">Рекомендации по улучшению</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-2.5">
+            {recommendations.map((r) => (
+              <Recommendation key={r.title} {...r} />
+            ))}
+          </CardContent>
+        </Card>
 
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        <DataModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={businessData} onSave={saveBusinessData} />
+        <DataModal
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          data={businessData}
+          onSave={saveBusinessData}
+        />
       </div>
     </ErrorBoundary>
   );

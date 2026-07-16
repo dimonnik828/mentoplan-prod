@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "../components/Header";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
+import { AppSidebar } from "@/components/sidebar-nav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +15,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MOMENTO — Аудит общепита",
-  description: "Бизнес-аналитика и аудит для предприятий общественного питания",
+  title: "MOMENTO — Аналитика ресторанного бизнеса",
+  description: "Экспресс-аудит и аналитика показателей ресторана",
+  icons: {
+    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  },
 };
 
 export default function RootLayout({
@@ -28,11 +31,11 @@ export default function RootLayout({
     <html lang="ru" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ background: 'var(--bg)', color: 'var(--text)' }}
       >
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-1 overflow-y-auto">
+        <div className="flex min-h-screen">
+          <AppSidebar />
+          <main className="flex-1 min-w-0">
+            <div className="lg:hidden h-14" />
             {children}
           </main>
         </div>
