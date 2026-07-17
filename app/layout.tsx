@@ -1,8 +1,10 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { AppSidebar } from "@/components/sidebar-nav";
+import { SidebarWrapper } from "@/components/sidebar-wrapper";
+import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,14 +34,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="flex min-h-screen">
-          <AppSidebar />
-          <main className="flex-1 min-w-0">
-            <div className="lg:hidden h-14" />
-            {children}
-          </main>
-        </div>
-        <Toaster />
+        <AnalyticsProvider>
+          <div className="flex min-h-screen">
+            <SidebarWrapper />
+            <main className="flex-1 min-w-0">
+              <div className="lg:hidden h-14" />
+              {children}
+            </main>
+          </div>
+          <Toaster />
+        </AnalyticsProvider>
       </body>
     </html>
   );

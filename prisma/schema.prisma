@@ -141,44 +141,37 @@ model TTK {
   receiptName     String?
 }
 
-// НОВЫЕ МОДЕЛИ ДЛЯ ИНГРЕДИЕНТОВ И КАТЕГОРИЙ
-
 model Category {
-  id       String   @id @default(uuid())
-  name     String   @unique @db.VarChar(255)
-  parentId String?  @map("parent_id")
-  parent   Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  id       String     @id @default(uuid())
+  name     String     @unique @db.VarChar(255)
+  parentId String?    @map("parent_id")
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
 
   @@map("categories")
 }
 
 model Ingredient {
-  id           String   @id @default(uuid())
-  name         String   @unique @db.VarChar(255)
-  unit         String   @db.VarChar(10) // kg, g, l, ml, pcs и т.д.
-  pricePerUnit Float    @map("price_per_unit")
+  id           String @id @default(uuid())
+  name         String @unique @db.VarChar(255)
+  unit         String @db.VarChar(10)
+  pricePerUnit Float  @map("price_per_unit")
 
   @@map("ingredients")
 }
-model AnalyticsSession {
-  id        String   @id @default(uuid())
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  events    AnalyticsEvent[]
 
-  @@map("analytics_sessions")
-}
-
+// Аналитика – одна модель без дубликатов
 model AnalyticsEvent {
-  id        String           @id @default(uuid())
-  sessionId String           @map("session_id")
-  session   AnalyticsSession @relation(fields: [sessionId], references: [id])
-  type      String           // pageview, click, error, time_on_page, attack
-  page      String?
-  data      Json?            // дополнительные данные (координаты клика, сообщение ошибки и т.д.)
-  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  type      String
+  path      String?
+  timestamp BigInt?
+  data      Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  @@index([type])
+  @@index([sessionId])
+  @@index([timestamp])
   @@map("analytics_events")
 }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, BarChart3, FileText, History,
-  Settings, Wrench, Megaphone, Menu, X, LayoutGrid, ChevronDown,
+  Settings, Wrench, Megaphone, Menu, X, LayoutGrid, ChevronDown, Info,
 } from 'lucide-react';
 
 const NAV_GROUPS = [
@@ -24,6 +24,7 @@ const NAV_GROUPS = [
         ],
       },
       { href: '/marketing', label: 'Маркетинг', icon: Megaphone },
+      { href: '/about', label: 'О проекте', icon: Info },
     ],
   },
   {
