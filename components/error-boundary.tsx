@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { sendAnalyticsEvent } from '@/lib/analytics-bus';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -16,6 +17,22 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Отправляем ошибку в аналитику через общую шину
+    sendAnalyticsEvent({
+      type: 'error',
+      path: window.location.pathname,
+      data: {
+        message: error.message,
+        source: 'react_error_boundary',
+        componentStack: errorInfo.componentStack,
+      },
+    });
+
+    // По желанию можно оставить вывод в консоль
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   render() {

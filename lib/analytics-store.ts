@@ -30,6 +30,7 @@ const sessions: Record<string, {
 }> = {};
 
 export async function trackEvent(e: Omit<TrackedEvent, 'id' | 'timestamp'>): Promise<TrackedEvent> {
+  console.log('trackEvent called with:', e.type, e.path);
   const event = await prisma.analyticsEvent.create({
     data: {
       type: e.type,

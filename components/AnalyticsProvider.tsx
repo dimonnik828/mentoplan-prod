@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import { setAnalyticsListener } from '@/lib/analytics-bus';
 
 const ENDPOINT = '/api/admin/analytics/track';
 const BATCH_INTERVAL = 5000;
@@ -37,13 +38,18 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const track = (event: Record<string, unknown>) => {
+  const track = useCallback((event: Record<string, unknown>) => {
     buffer.current.push({
       ...event,
       sessionId: sessionId.current,
       timestamp: Date.now(),
     });
-  };
+  }, []);
+
+  // Регистрируем track в шине, чтобы ErrorBoundary мог отправлять события
+  useEffect(() => {
+    setAnalyticsListener(track);
+  }, [track]);
 
   const endCurrentPage = () => {
     const duration = Date.now() - pageEnterTime.current;
@@ -229,7 +235,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       window.fetch = originalFetch;
       history.pushState = pushState;
     };
-  }, []);
+  }, [track]); // track теперь стабилен, но оставлен для уверенности
 
   return <>{children}</>;
 }
