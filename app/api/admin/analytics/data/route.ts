@@ -9,6 +9,7 @@ import {
   getBehaviorData,
   getProcessLog,
   getStats,
+  getBehaviorTimeline,
 } from '@/lib/analytics-store';
 
 export async function GET(request: NextRequest) {
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
       case 'overview':
         return NextResponse.json(await getStats());
       case 'sessions':
-        return NextResponse.json(getSessions()); // синхронная, работает с памятью
+        return NextResponse.json(getSessions());
       case 'top-pages':
         return NextResponse.json(await getTopPages(20));
       case 'errors':
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(await getPerformanceMetrics());
       case 'behavior':
         return NextResponse.json(await getBehaviorData());
+      case 'behavior-timeline':
+        return NextResponse.json(await getBehaviorTimeline());
       case 'processes':
         return NextResponse.json(await getProcessLog(100));
       default:

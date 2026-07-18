@@ -145,24 +145,28 @@ export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [procFilter, setProcFilter] = useState('all');
+  const [timeline, setTimeline] = useState<any[]>([]);
 
-  const fetchSection = useCallback(async (section: string) => {
-    try {
-      const r = await fetch(`/api/admin/analytics/data?section=${section}`);
-      const t = await r.text();
-      try { return JSON.parse(t); } catch { return null; }
-    } catch { return null; }
-  }, []);
+const fetchSection = useCallback(async (section: string) => {
+  try {
+    const r = await fetch(`/api/admin/analytics/data?section=${section}`, {
+      headers: { 'x-admin-token': process.env.NEXT_PUBLIC_ADMIN_TOKEN || '' },
+    });
+    if (!r.ok) throw new Error('Unauthorized');
+    const t = await r.text();
+    try { return JSON.parse(t); } catch { return null; }
+  } catch { return null; }
+}, []);
 
   const reload = useCallback(async () => {
     try {
-      const [ov, ses, pg, err, atk, pr, beh, proc] = await Promise.all([
+      const [ov, ses, pg, err, atk, pr, beh, proc, tl] = await Promise.all([
         fetchSection('overview'), fetchSection('sessions'),
         fetchSection('top-pages'), fetchSection('errors'),
         fetchSection('attacks'), fetchSection('performance'),
         fetchSection('behavior'), fetchSection('processes'),
+        fetchSection('behavior-timeline'),
       ]);
-      // Отладочный лог (можно удалить после проверки)
       console.log('Behavior data:', beh);
       if (ov) setOverview(ov);
       if (Array.isArray(ses)) setSessions(ses);
@@ -172,6 +176,7 @@ export default function AdminAnalyticsPage() {
       if (pr) setPerf(pr);
       if (beh) setBehavior(beh);
       if (Array.isArray(proc)) setProcesses(proc);
+      if (Array.isArray(tl)) setTimeline(tl);
       setError(null);
     } catch {
       setError('Не удалось загрузить данные аналитики');
@@ -283,6 +288,10 @@ export default function AdminAnalyticsPage() {
                 value={overview?.activeSessions ?? 0}
                 sub={`Всего: ${overview?.totalSessions ?? 0}`}
                 color="text-emerald-600" />
+              <StatCard icon={Users} label="Уникальные польз."
+                value={overview?.totalSessions ?? 0}
+                sub="Всего сессий"
+                color="text-blue-600" />
               <StatCard icon={Zap} label="Загрузка стр."
                 value={fmtTime(overview?.performance?.avgPageLoad ?? 0)}
                 sub={`API: ${fmtTime(overview?.performance?.avgApiTime ?? 0)}`}
@@ -420,128 +429,189 @@ export default function AdminAnalyticsPage() {
 
         {/* ═══════ BEHAVIOR ═══════ */}
         {tab === 'behavior' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Click Heatmap */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <MousePointerClick className="size-4 text-indigo-500" /> Тепловая карта кликов
-                </CardTitle>
-                <CardDescription>Самые нажимаемые элементы</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!behavior || !behavior.clickHeatmap || behavior.clickHeatmap.length === 0 ? (
-                  <Empty text="Данных о кликах пока нет — начните взаимодействовать со страницами" />
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Элемент</TableHead>
-                        <TableHead className="text-xs">Страница</TableHead>
-                        <TableHead className="text-xs text-right">Кликов</TableHead>
-                        <TableHead className="text-xs text-right">Интенс.</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {behavior.clickHeatmap.slice(0, 12).map((c, i) => {
-                        const pct = Math.round((c.count / behavior.clickHeatmap[0].count) * 100);
-                        return (
-                          <TableRow key={i}>
-                            <TableCell className="text-xs font-mono max-w-[160px] truncate" title={c.element}>{c.element}</TableCell>
-                            <TableCell className="text-xs font-mono text-muted-foreground">{c.path}</TableCell>
-                            <TableCell className="text-xs text-right tabular-nums">{c.count}</TableCell>
-                            <TableCell className="text-xs text-right w-28">
-                              <div className="flex items-center gap-2">
-                                <Progress value={pct} className="h-1.5 flex-1" />
-                                <span className="tabular-nums text-muted-foreground w-8 text-right">{pct}%</span>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Click Heatmap */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <MousePointerClick className="size-4 text-indigo-500" /> Тепловая карта кликов
+                  </CardTitle>
+                  <CardDescription>Самые нажимаемые элементы</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!behavior || !behavior.clickHeatmap || behavior.clickHeatmap.length === 0 ? (
+                    <Empty text="Данных о кликах пока нет — начните взаимодействовать со страницами" />
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Элемент</TableHead>
+                          <TableHead className="text-xs">Страница</TableHead>
+                          <TableHead className="text-xs text-right">Кликов</TableHead>
+                          <TableHead className="text-xs text-right">Интенс.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {behavior.clickHeatmap.slice(0, 12).map((c, i) => {
+                          const pct = Math.round((c.count / behavior.clickHeatmap[0].count) * 100);
+                          return (
+                            <TableRow key={i}>
+                              <TableCell className="text-xs font-mono max-w-[160px] truncate" title={c.element}>{c.element}</TableCell>
+                              <TableCell className="text-xs font-mono text-muted-foreground">{c.path}</TableCell>
+                              <TableCell className="text-xs text-right tabular-nums">{c.count}</TableCell>
+                              <TableCell className="text-xs text-right w-28">
+                                <div className="flex items-center gap-2">
+                                  <Progress value={pct} className="h-1.5 flex-1" />
+                                  <span className="tabular-nums text-muted-foreground w-8 text-right">{pct}%</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Navigation Flow */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <ArrowDownUp className="size-4 text-blue-500" /> Навигационные потоки
-                </CardTitle>
-                <CardDescription>Как пользователи перемещаются</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {!behavior || !behavior.navigationFlow || behavior.navigationFlow.length === 0 ? (
-                  <Empty text="Навигационных данных пока нет" />
-                ) : (
-                  behavior.navigationFlow.slice(0, 12).map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
-                      <Badge variant="outline" className="text-xs font-mono shrink-0 max-w-[120px] truncate">{f.from}</Badge>
-                      <ArrowRight className="size-3.5 text-muted-foreground shrink-0" />
-                      <Badge variant="outline" className="text-xs font-mono shrink-0 max-w-[120px] truncate">{f.to}</Badge>
-                      <div className="flex-1" />
-                      <Badge variant="secondary" className="tabular-nums text-xs">{f.count}x</Badge>
-                      <Progress value={(f.count / maxFlow) * 100} className="h-1.5 w-16" />
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Page Durations */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Timer className="size-4 text-amber-500" /> Время на странице
-                </CardTitle>
-                <CardDescription>Средняя продолжительность визита</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {!behavior || !behavior.pageDurations || behavior.pageDurations.length === 0 ? (
-                  <Empty text="Данных о времени на странице пока нет" />
-                ) : (
-                  behavior.pageDurations.map((d, i) => (
-                    <div key={i} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-mono text-xs text-foreground truncate max-w-[220px]">{d.page}</span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs text-muted-foreground tabular-nums">{fmtTime(d.avgSeconds * 1000)}</span>
-                          <Badge variant="secondary" className="tabular-nums text-xs px-1.5">{d.visits} виз.</Badge>
-                        </div>
+              {/* Navigation Flow */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <ArrowDownUp className="size-4 text-blue-500" /> Навигационные потоки
+                  </CardTitle>
+                  <CardDescription>Как пользователи перемещаются</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {!behavior || !behavior.navigationFlow || behavior.navigationFlow.length === 0 ? (
+                    <Empty text="Навигационных данных пока нет" />
+                  ) : (
+                    behavior.navigationFlow.slice(0, 12).map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
+                        <Badge variant="outline" className="text-xs font-mono shrink-0 max-w-[120px] truncate">{f.from}</Badge>
+                        <ArrowRight className="size-3.5 text-muted-foreground shrink-0" />
+                        <Badge variant="outline" className="text-xs font-mono shrink-0 max-w-[120px] truncate">{f.to}</Badge>
+                        <div className="flex-1" />
+                        <Badge variant="secondary" className="tabular-nums text-xs">{f.count}x</Badge>
+                        <Progress value={(f.count / maxFlow) * 100} className="h-1.5 w-16" />
                       </div>
-                      <Progress value={(d.visits / (behavior.pageDurations[0].visits || 1)) * 100} className="h-1.5" />
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Action Frequency */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <TrendingUp className="size-4 text-emerald-500" /> Частота действий
-                </CardTitle>
-                <CardDescription>Самые популярные действия</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {!behavior || !behavior.actionFrequency || behavior.actionFrequency.length === 0 ? (
-                  <Empty text="Данных о действиях пока нет" />
-                ) : (
-                  behavior.actionFrequency.map((a, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/40 transition-colors">
-                      <span className="text-xs font-bold text-muted-foreground tabular-nums w-5 text-right">{i + 1}</span>
-                      <span className="text-xs text-foreground flex-1">{a.action}</span>
-                      <Badge variant="secondary" className="tabular-nums text-xs">{a.count}</Badge>
+              {/* Page Durations */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Timer className="size-4 text-amber-500" /> Время на странице
+                  </CardTitle>
+                  <CardDescription>Средняя продолжительность визита</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {!behavior || !behavior.pageDurations || behavior.pageDurations.length === 0 ? (
+                    <Empty text="Данных о времени на странице пока нет" />
+                  ) : (
+                    behavior.pageDurations.map((d, i) => (
+                      <div key={i} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-mono text-xs text-foreground truncate max-w-[220px]">{d.page}</span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs text-muted-foreground tabular-nums">{fmtTime(d.avgSeconds * 1000)}</span>
+                            <Badge variant="secondary" className="tabular-nums text-xs px-1.5">{d.visits} виз.</Badge>
+                          </div>
+                        </div>
+                        <Progress value={(d.visits / (behavior.pageDurations[0].visits || 1)) * 100} className="h-1.5" />
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Action Frequency */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="size-4 text-emerald-500" /> Частота действий
+                  </CardTitle>
+                  <CardDescription>Самые популярные действия</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  {!behavior || !behavior.actionFrequency || behavior.actionFrequency.length === 0 ? (
+                    <Empty text="Данных о действиях пока нет" />
+                  ) : (
+                    behavior.actionFrequency.map((a, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                        <span className="text-xs font-bold text-muted-foreground tabular-nums w-5 text-right">{i + 1}</span>
+                        <span className="text-xs text-foreground flex-1">{a.action}</span>
+                        <Badge variant="secondary" className="tabular-nums text-xs">{a.count}</Badge>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Динамика за 30 дней */}
+            <div className="mt-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="size-4 text-emerald-500" /> Динамика за последние 30 дней
+                  </CardTitle>
+                  <CardDescription>Количество событий по дням</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {timeline.length === 0 ? (
+                    <Empty text="Данных для отображения недостаточно" />
+                  ) : (
+                    <div className="w-full overflow-x-auto">
+                      <svg viewBox={`0 0 ${timeline.length * 60 + 40} 220`} className="w-full h-48">
+                        {timeline.map((day, i) => {
+                          const maxVal = Math.max(day.clicks, day.pageViews, day.scrolls, day.errors, 1);
+                          const barWidth = 12;
+                          const x = 40 + i * 55;
+                          const colors = { clicks: '#6366f1', pageViews: '#0ea5e9', scrolls: '#10b981', errors: '#ef4444' };
+                          const types = ['clicks', 'pageViews', 'scrolls', 'errors'] as const;
+                          return (
+                            <g key={day.date}>
+                              <text x={x + 5} y={200} className="text-[10px] fill-muted-foreground" textAnchor="middle">
+                                {day.date.slice(5)}
+                              </text>
+                              {types.map((t, j) => (
+                                <rect
+                                  key={t}
+                                  x={x + j * (barWidth + 2)}
+                                  y={180 - (day[t] / maxVal) * 150}
+                                  width={barWidth}
+                                  height={(day[t] / maxVal) * 150}
+                                  fill={colors[t]}
+                                  rx={1}
+                                />
+                              ))}
+                              {i === 0 && (
+                                <g transform="translate(0, 10)">
+                                  {types.map((t, j) => (
+                                    <rect key={t} x={5 + j * 55} y={0} width={8} height={8} fill={colors[t]} rx={1} />
+                                  ))}
+                                  {types.map((t, j) => (
+                                    <text key={t} x={15 + j * 55} y={8} className="text-[8px] fill-muted-foreground">
+                                      {t === 'pageViews' ? 'просм.' : t}
+                                    </text>
+                                  ))}
+                                </g>
+                              )}
+                            </g>
+                          );
+                        })}
+                      </svg>
                     </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
         )}
 
         {/* ═══════ PERFORMANCE ═══════ */}
@@ -568,7 +638,6 @@ export default function AdminAnalyticsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2.5">
-                  {/* ИСПРАВЛЕНО: добавлена проверка на существование массива */}
                   {!perf || !perf.slowestPages || perf.slowestPages.length === 0 ? (
                     <Empty text="Данных о производительности пока нет" />
                   ) : (

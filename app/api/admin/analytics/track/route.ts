@@ -8,14 +8,26 @@ import {
 } from '@/lib/analytics-store';
 
 export async function POST(request: NextRequest) {
+  // ─── Проверка авторизации (даже если уже стоит middleware, дублируем) ───
+  const token = request.headers.get('x-admin-token');
+  if (token !== process.env.ADMIN_API_TOKEN) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { events } = body as { events: Record<string, unknown>[] };
 
+    // ─── Валидация ───
     if (!Array.isArray(events) || events.length === 0) {
       return NextResponse.json({ error: 'No events provided' }, { status: 400 });
     }
 
+    if (events.length > 100) {
+      return NextResponse.json({ error: 'Too many events in one batch (max 100)' }, { status: 400 });
+    }
+
+    // ─── Обработка ───
     for (const event of events) {
       const type = event.type as string;
       const sessionId = (event.sessionId as string) || 'anonymous';
@@ -31,7 +43,8 @@ export async function POST(request: NextRequest) {
           startSession(sessionId, '');
         }
 
-        trackEvent({
+        // trackEvent асинхронный, поэтому используем await, чтобы не пропустить ошибки
+        await trackEvent({
           type: type as any,
           path,
           sessionId,
@@ -41,7 +54,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error('Track error:', error);
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 }

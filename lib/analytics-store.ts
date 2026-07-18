@@ -30,7 +30,6 @@ const sessions: Record<string, {
 }> = {};
 
 export async function trackEvent(e: Omit<TrackedEvent, 'id' | 'timestamp'>): Promise<TrackedEvent> {
-  console.log('trackEvent called with:', e.type, e.path);
   const event = await prisma.analyticsEvent.create({
     data: {
       type: e.type,
@@ -259,4 +258,42 @@ export async function getStats() {
     recentErrors: await getRecentErrors(5),
     performance: await getPerformanceMetrics(),
   };
+}
+
+// Новая функция: возвращает агрегированные данные по дням для указанных типов событий
+export async function getBehaviorTimeline() {
+  // Получаем все события за последние 30 дней (или все, если их мало)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const events = await prisma.analyticsEvent.findMany({
+    where: {
+      createdAt: { gte: thirtyDaysAgo },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Собираем статистику по дням
+  const dailyMap = new Map<string, { clicks: number; pageViews: number; scrolls: number; errors: number }>();
+
+  events.forEach(e => {
+    const date = new Date(e.createdAt).toISOString().slice(0, 10); // YYYY-MM-DD
+    if (!dailyMap.has(date)) {
+      dailyMap.set(date, { clicks: 0, pageViews: 0, scrolls: 0, errors: 0 });
+    }
+    const day = dailyMap.get(date)!;
+    switch (e.type) {
+      case 'click': day.clicks++; break;
+      case 'page_view': day.pageViews++; break;
+      case 'scroll': day.scrolls++; break;
+      case 'error': day.errors++; break;
+    }
+  });
+
+  // Преобразуем в массив, сортированный по дате
+  const timeline = Array.from(dailyMap.entries())
+    .map(([date, counts]) => ({ date, ...counts }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return timeline;
 }

@@ -30,7 +30,10 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     try {
       await fetch(ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': process.env.NEXT_PUBLIC_ADMIN_TOKEN || '',
+        },
         body: JSON.stringify({ events: batch }),
       });
     } catch (e) {
@@ -235,7 +238,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       window.fetch = originalFetch;
       history.pushState = pushState;
     };
-  }, [track]); // track теперь стабилен, но оставлен для уверенности
+  }, [track]);
 
   return <>{children}</>;
 }
