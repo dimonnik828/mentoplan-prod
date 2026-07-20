@@ -5,20 +5,12 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  Megaphone,
   Info,
-  Settings,
-  Wrench,
   Menu,
   X,
   ChevronDown,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-
-const systemLinks = [
-  { href: '/admin/ttk', label: 'Управление ТТК', icon: Settings },
-  { href: '/diagnostics', label: 'Диагностика', icon: Wrench },
-];
 
 export function HeaderNav() {
   const pathname = usePathname();
@@ -106,24 +98,10 @@ export function HeaderNav() {
             )}
           </div>
 
-          <Link href="/marketing" className={linkClassName('/marketing')}>
-            <Megaphone className="h-4 w-4" />
-            Маркетинг
-          </Link>
-
           <Link href="/about" className={linkClassName('/about')}>
             <Info className="h-4 w-4" />
             О проекте
           </Link>
-
-          <span className="mx-2 text-border">|</span>
-
-          {systemLinks.map((link) => (
-            <Link key={link.href} href={link.href} className={linkClassName(link.href)}>
-              <link.icon className="h-4 w-4" />
-              {link.label}
-            </Link>
-          ))}
         </nav>
 
         {/* Мобильная кнопка */}
@@ -147,27 +125,10 @@ export function HeaderNav() {
             Расширенный аудит
           </Link>
 
-          <Link href="/marketing" onClick={() => setMobileOpen(false)} className={linkClassName('/marketing')}>
-            <Megaphone className="h-4 w-4" />
-            Маркетинг
-          </Link>
           <Link href="/about" onClick={() => setMobileOpen(false)} className={linkClassName('/about')}>
             <Info className="h-4 w-4" />
             О проекте
           </Link>
-
-          <div className="py-2 text-sm font-medium text-muted-foreground">Система</div>
-          {systemLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileOpen(false)}
-              className={linkClassName(link.href)}
-            >
-              <link.icon className="h-4 w-4" />
-              {link.label}
-            </Link>
-          ))}
         </div>
       )}
     </header>
