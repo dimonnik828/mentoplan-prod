@@ -1,72 +1,32 @@
-// app/api/admin/ttk/[id]/route.ts
-import { NextResponse } from 'next/server';
-import { ttkUpdateSchema } from '@/lib/validations';
-import { ZodError } from 'zod';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const ttk = await prisma.tTK.findUnique({ where: { id: params.id }, include: { ingredients: true } });
-    if (!ttk) return NextResponse.json({ error: 'ТТК не найдена' }, { status: 404 });
-    return NextResponse.json(ttk);
-  } catch (error) {
-    console.error('[API admin/ttk GET by id]', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
-  }
-}
+    // Дожидаемся промиса params
+    const { id } = await params;
+    const cardId = parseInt(id, 10);
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  try {
-    const contentType = request.headers.get('content-type');
-    if (!contentType?.includes('application/json')) return NextResponse.json({ error: 'Требуется application/json' }, { status: 415 });
-    const contentLength = Number(request.headers.get('content-length') || 0);
-    if (contentLength > 2 * 1024 * 1024) return NextResponse.json({ error: 'Тело запроса слишком большое' }, { status: 413 });
-
-    let body;
-    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 }); }
-
-    const parsed = ttkUpdateSchema.parse(body);
-
-    const updateData: any = {};
-    if (parsed.name !== undefined) updateData.name = parsed.name;
-    if (parsed.description !== undefined) updateData.description = parsed.description;
-    if (parsed.price !== undefined) updateData.price = parsed.price;
-    if (parsed.categoryId !== undefined) updateData.categoryId = parsed.categoryId;
-
-    const ttk = await prisma.tTK.update({ where: { id: params.id }, data: updateData });
-
-    // Обновление ингредиентов, если переданы
-    if (parsed.ingredients) {
-      // Удаляем старые связи
-      await prisma.tTKIngredient.deleteMany({ where: { ttkId: params.id } });
-      for (const ing of parsed.ingredients) {
-        await prisma.tTKIngredient.create({
-          data: { ttkId: params.id, ingredientId: ing.ingredientId, quantity: ing.quantity },
-        });
-      }
+    if (isNaN(cardId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data: ttk });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Ошибка валидации', details: error.errors.map(e => ({ field: e.path.join('.'), message: e.message })) },
-        { status: 400 }
-      );
-    }
-    console.error('[API admin/ttk PUT]', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
-  }
-}
+    const card = await prisma.tTK.findUnique({
+      where: { id: cardId },
+    });
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  try {
-    await prisma.tTK.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true });
+    if (!card) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(card);
   } catch (error) {
-    console.error('[API admin/ttk DELETE]', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
+    console.error('TTK detail error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

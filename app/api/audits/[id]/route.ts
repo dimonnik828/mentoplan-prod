@@ -9,18 +9,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-
-    const audit = await prisma.audit.findUnique({
-      where: { id },
-    });
-
+    const audit = await prisma.audit.findUnique({ where: { id } });
     if (!audit) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-
     return NextResponse.json(audit);
   } catch (error) {
-    console.error('Audit detail error:', error);
+    console.error('Audit GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
