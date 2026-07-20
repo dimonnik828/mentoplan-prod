@@ -384,7 +384,7 @@ const fetchSection = useCallback(async (section: string) => {
                       <div key={e.id} className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/5 border border-destructive/10">
                         <AlertTriangle className="size-3.5 text-destructive mt-0.5 shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs text-destructive font-medium truncate">{e.data?.message || 'Неизвестная ошибка'}</p>
+                          <p className="text-xs text-destructive font-medium truncate">{String(e.data?.message ?? '') || 'Неизвестная ошибка'}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">{e.path} · {fmtTs(e.timestamp)}</p>
                         </div>
                       </div>
