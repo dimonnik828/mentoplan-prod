@@ -407,15 +407,21 @@ const fetchSection = useCallback(async (section: string) => {
                       <div key={p.id} className="flex items-center gap-2.5 py-1.5 px-1 rounded hover:bg-muted/40 transition-colors">
                         <EvIcon type={p.type} />
                         <span className="text-xs text-foreground truncate flex-1 min-w-0">
-                          {p.type === 'api_call'
-                            ? <><span className="font-mono">{p.data?.endpoint || 'API'}</span>
-                               <Badge variant={Number(p.data?.status) >= 400 ? 'destructive' : 'secondary'} className="ml-1 text-[10px] px-1 py-0">{p.data?.status || '?'}</Badge>
-                               {p.data?.duration > 0 && <span className="text-muted-foreground ml-1">{fmtTime(p.data.duration as number)}</span>}</>
-                            : p.type === 'action' ? p.data?.action || 'Действие'
-                            : p.type === 'performance' ? <>{p.data?.metric}: {fmtTime(p.data?.value as number || 0)}</>
-                            : p.type === 'page_view' ? <>просмотр <span className="font-mono">{p.path}</span></>
-                            : p.type === 'click' ? <>{p.data?.element || p.data?.tag || 'click'}</>
-                            : evLabel(p.type)}
+                         {p.type === 'api_call' ? (
+                          <><span className="font-mono">{String(p.data?.endpoint ?? '') || 'API'}</span>
+                             <Badge variant={Number(p.data?.status) >= 400 ? 'destructive' : 'secondary'} className="ml-1 text-[10px] px-1 py-0">{p.data?.status || '?'}</Badge>
+                             {p.data?.duration > 0 && <span className="text-muted-foreground ml-1">{fmtTime(p.data.duration as number)}</span>}</>
+                        ) : p.type === 'action' ? (
+                          <>{p.data?.action as string || 'Действие'}</>
+                        ) : p.type === 'performance' ? (
+                          <>{String(p.data?.metric ?? '')}: {fmtTime(p.data?.value as number || 0)}</>
+                        ) : p.type === 'page_view' ? (
+                          <>просмотр <span className="font-mono">{p.path}</span></>
+                        ) : p.type === 'click' ? (
+                          <>{p.data?.element as string || p.data?.tag as string || 'click'}</>
+                        ) : (
+                          <>{evLabel(p.type)}</>
+                        )}
                         </span>
                         <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{fmtTs(p.timestamp)}</span>
                       </div>
@@ -677,7 +683,7 @@ const fetchSection = useCallback(async (section: string) => {
                       <div key={p.id} className="flex items-center gap-2.5 py-1.5 px-1 rounded hover:bg-muted/40 transition-colors">
                         <Zap className="size-3.5 text-amber-500 shrink-0" />
                         <span className="text-xs text-foreground flex-1">
-                          <span className="font-medium">{p.data?.metric}</span>
+                          <span className="font-medium">{String(p.data?.metric ?? '')}</span>
                           <span className="text-muted-foreground ml-2">{fmtTime(p.data?.value as number || 0)}</span>
                           {p.data?.ttfb != null && <span className="text-muted-foreground ml-2">TTFB: {fmtTime(p.data.ttfb as number)}</span>}
                         </span>
@@ -718,7 +724,7 @@ const fetchSection = useCallback(async (section: string) => {
                         <Badge variant="destructive" className="text-xs">{e.data?.source === 'api' ? 'API' : e.data?.source === 'promise' ? 'Promise' : 'Runtime'}</Badge>
                         <span className="text-[11px] text-muted-foreground tabular-nums">{fmtTs(e.timestamp)}</span>
                       </div>
-                      <p className="text-xs text-foreground break-all">{e.data?.message || 'Неизвестная ошибка'}</p>
+                      <p className="text-xs text-foreground break-all">{String(e.data?.message ?? '') || 'Неизвестная ошибка'}</p>
                       {e.path && <p className="text-xs text-muted-foreground font-mono">{e.path}</p>}
                       {e.data?.lineno && (
                         <p className="text-[11px] text-muted-foreground">Строка {e.data.lineno}:{e.data.colno} — {String(e.data.filename || '').split('/').pop()}</p>
@@ -813,13 +819,13 @@ const fetchSection = useCallback(async (section: string) => {
                             <div className="truncate">
                               {p.type === 'api_call' && (
                                 <>
-                                  <span className="font-mono">{p.data?.endpoint}</span>
+                                  <span className="font-mono">{String(p.data?.endpoint ?? '') || 'API'}</span>
                                   <Badge variant={Number(p.data?.status) >= 400 ? 'destructive' : 'secondary'} className="ml-1.5 text-[10px] px-1.5 py-0">{p.data?.status || 'pending'}</Badge>
                                   {p.data?.duration > 0 && <span className="text-muted-foreground ml-1.5">{fmtTime(p.data.duration as number)}</span>}
                                 </>
                               )}
-                              {p.type === 'action' && <span>{p.data?.action || 'Действие'}</span>}
-                              {p.type === 'performance' && <span>{p.data?.metric}: <span className="tabular-nums">{fmtTime(p.data?.value as number || 0)}</span></span>}
+                              {p.type === 'action' && <span>{String(p.data?.action ?? '') || 'Действие'}</span>}
+                              {p.type === 'performance' && <span>{String(p.data?.metric ?? '')}: <span className="tabular-nums">{fmtTime(p.data?.value as number || 0)}</span></span>}
                               {p.type === 'session_start' && <span className="text-emerald-600">Сессия начата</span>}
                               {p.type === 'session_end' && <span className="text-muted-foreground">Завершена ({fmtTime(p.data?.duration as number || 0)})</span>}
                               {p.type === 'page_view' && (
@@ -829,13 +835,13 @@ const fetchSection = useCallback(async (section: string) => {
                                 </>
                               )}
                               {p.type === 'click' && (
-                                <><MousePointer className="size-3 inline mr-1 text-violet-500" />{p.data?.element || p.data?.tag || 'click'}</>
+                                <><MousePointer className="size-3 inline mr-1 text-violet-500" />{String(p.data?.element ?? '') || String(p.data?.tag ?? '') || 'click'}</>
                               )}
                               {p.type === 'scroll' && (
                                 <><ScrollText className="size-3 inline mr-1 text-teal-500" />Скролл до {p.data?.depth}%</>
                               )}
                               {p.type === 'error' && (
-                                <span className="text-destructive">{p.data?.message || 'Ошибка'}</span>
+                                <span className="text-destructive">{String(p.data?.message ?? '') || 'Ошибка'}</span>
                               )}
                             </div>
                           </TableCell>
