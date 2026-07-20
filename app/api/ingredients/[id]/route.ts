@@ -1,66 +1,55 @@
-// app/api/ingredients/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
-import { ingredientUpdateSchema } from '@/lib/validations';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return apiHandler({
-    request,
-    handler: async () => {
-      const ingredient = await prisma.ingredient.findUnique({
-        where: { id: params.id },
-      });
-      if (!ingredient) {
-        return NextResponse.json(
-          { error: 'Ингредиент не найден' },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json(ingredient);
-    },
-  });
+  try {
+    const { id } = await params;
+    const ingredient = await prisma.ingredient.findUnique({ where: { id } });
+    if (!ingredient) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json(ingredient);
+  } catch (error) {
+    console.error('Ingredient GET error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return apiHandler({
-    request,
-    schema: ingredientUpdateSchema,
-    handler: async (parsed) => {
-      const updateData: any = {};
-      if (parsed.name !== undefined) updateData.name = parsed.name;
-      if (parsed.unit !== undefined) updateData.unit = parsed.unit;
-      if (parsed.pricePerUnit !== undefined) updateData.pricePerUnit = parsed.pricePerUnit;
-
-      const ingredient = await prisma.ingredient.update({
-        where: { id: params.id },
-        data: updateData,
-      });
-
-      return NextResponse.json({ success: true, data: ingredient });
-    },
-  });
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const updated = await prisma.ingredient.update({
+      where: { id },
+      data: {
+        name: body.name,
+        unit: body.unit,
+        pricePerUnit: body.pricePerUnit,
+      },
+    });
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Ingredient PUT error:', error);
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+  }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return apiHandler({
-    request,
-    handler: async () => {
-      await prisma.ingredient.delete({
-        where: { id: params.id },
-      });
-      return NextResponse.json({ success: true });
-    },
-  });
+  try {
+    const { id } = await params;
+    await prisma.ingredient.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Ingredient DELETE error:', error);
+    return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+  }
 }
