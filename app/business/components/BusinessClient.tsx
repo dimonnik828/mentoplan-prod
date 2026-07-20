@@ -1013,14 +1013,14 @@ export default function BusinessPage() {
       <HelpModal isOpen={helpModal.open} onClose={closeHelp} title={helpTexts[helpModal.block]?.title || ''}>
         {helpModal.block === 'location' ? (
           <>
-            <p className="whitespace-pre-line">{helpTexts.location.text}</p>
-            <p className="mt-2 text-xs">
+            <span className="whitespace-pre-line">{helpTexts.location.text}</span>
+            <span className="mt-2 text-xs">
               Данные о населении, домах и инфраструктуре можно получить на{' '}
               <a href="https://mosmap.ru/report/infra.html" target="_blank" className="underline text-primary">mosmap.ru/report/infra.html</a>
-            </p>
+            </span>
           </>
         ) : (
-          helpTexts[helpModal.block]?.text || ''
+          <span>{helpTexts[helpModal.block]?.text || ''}</span>
         )}
       </HelpModal>
     </div>

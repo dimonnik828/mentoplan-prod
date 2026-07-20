@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Users, Code2, Mail } from 'lucide-react';
+import { ContactForm } from '@/components/contact-form';
 
 export const metadata: Metadata = {
   title: 'О проекте | MOMENTO',
@@ -116,23 +117,6 @@ export default function AboutPage() {
           </CardContent>
         </Card>
 
-        {/* Технологии */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code2 className="h-5 w-5 text-primary" />
-              Технологии
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Проект построен на Next.js 16, TypeScript, Tailwind CSS и shadcn/ui.
-              Данные аудитов хранятся локально в браузере и синхронизируются с сервером через защищённое API.
-              Аналитика собирается в реальном времени для повышения качества сервиса.
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Контакты */}
         <Card>
           <CardHeader>
@@ -141,13 +125,13 @@ export default function AboutPage() {
               Контакты
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
               По всем вопросам и предложениям:{' '}
-              <a href="mailto:hello@mentoplan.ru" className="text-primary hover:underline">
-                hello@mentoplan.ru
-              </a>
+
             </p>
+
+            <ContactForm />
           </CardContent>
         </Card>
       </div>
