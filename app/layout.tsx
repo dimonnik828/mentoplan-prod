@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { SidebarWrapper } from "@/components/sidebar-wrapper";
+import { HeaderNav } from "@/components/header-nav";
 import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 
 const geistSans = Geist({
@@ -16,11 +16,46 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mentoplan.ru";
+
 export const metadata: Metadata = {
   title: "MOMENTO — Аналитика ресторанного бизнеса",
   description: "Экспресс-аудит и аналитика показателей ресторана",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  },
+  openGraph: {
+    title: "MOMENTO — Аналитика ресторанного бизнеса",
+    description: "Экспресс-аудит и аналитика показателей ресторана",
+    url: SITE_URL,
+    siteName: "MOMENTO",
+    images: [
+      {
+        url: `${SITE_URL}/og-image.png`,
+        width: 1200,
+        height: 630,
+        alt: "MOMENTO — Аналитика ресторанного бизнеса",
+      },
+    ],
+    locale: "ru_RU",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MOMENTO — Аналитика ресторанного бизнеса",
+    description: "Экспресс-аудит и аналитика показателей ресторана",
+    images: [`${SITE_URL}/og-image.png`],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
@@ -35,13 +70,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AnalyticsProvider>
-          <div className="flex min-h-screen">
-            <SidebarWrapper />
-            <main className="flex-1 min-w-0">
-              <div className="lg:hidden h-14" />
-              {children}
-            </main>
-          </div>
+          <HeaderNav />
+          <main className="min-h-[calc(100vh-3.5rem)]">{children}</main>
           <Toaster />
         </AnalyticsProvider>
       </body>
