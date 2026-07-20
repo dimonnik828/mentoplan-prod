@@ -1,6 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { TrendingUp, Users, DollarSign, AlertTriangle } from 'lucide-react';
 
 export default function Home() {
   const [form, setForm] = useState({
@@ -21,6 +27,7 @@ export default function Home() {
   });
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,6 +36,7 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
       const payload = {
@@ -55,170 +63,203 @@ export default function Home() {
       });
 
       const data = await res.json();
-      if (res.ok) {
-        setResult(data);
-      } else {
-        alert(data.error || 'Ошибка');
-      }
-    } catch (err) {
-      alert('Ошибка при отправке');
+      if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Не удалось выполнить анализ');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-4xl font-bold mb-6">MOMENTO — что дальше</h1>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <h1 className="text-3xl font-bold mb-6">Экспресс-аудит</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block font-medium">Название</label>
-            <input type="text" name="name" value={form.name} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Адрес</label>
-            <input type="text" name="address" value={form.address} onChange={handleChange} className="w-full border p-2 rounded" required />
-          </div>
-          <div>
-            <label className="block font-medium">Площадь общая (м²)</label>
-            <input type="number" name="totalArea" value={form.totalArea} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Площадь зала (м²)</label>
-            <input type="number" name="hallArea" value={form.hallArea} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Посадочных мест</label>
-            <input type="number" name="seats" value={form.seats} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Количество сотрудников</label>
-            <input type="number" name="staffCount" value={form.staffCount} onChange={handleChange} className="w-full border p-2 rounded" required />
-          </div>
-          <div>
-            <label className="block font-medium">Выручка в месяц (₽)</label>
-            <input type="number" name="revenue" value={form.revenue} onChange={handleChange} className="w-full border p-2 rounded" required />
-          </div>
-          <div>
-            <label className="block font-medium">Средний чек (₽)</label>
-            <input type="number" name="avgCheck" value={form.avgCheck} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Аренда (₽)</label>
-            <input type="number" name="rent" value={form.rent} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Коммунальные платежи (₽)</label>
-            <input type="number" name="utilities" value={form.utilities} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">ФОТ (₽)</label>
-            <input type="number" name="payroll" value={form.payroll} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Затраты на управление (₽)</label>
-            <input type="number" name="managementCosts" value={form.managementCosts} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Себестоимость (₽)</label>
-            <input type="number" name="costOfGoods" value={form.costOfGoods} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block font-medium">Прочие расходы (₽)</label>
-            <input type="number" name="otherExpenses" value={form.otherExpenses} onChange={handleChange} className="w-full border p-2 rounded" />
-          </div>
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white py-2 px-6 rounded disabled:opacity-50 w-full md:w-auto"
-        >
-          {loading ? 'Анализируем...' : 'Получить рекомендации'}
-        </button>
-      </form>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Данные заведения</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Название</label>
+                <Input name="name" value={form.name} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Адрес</label>
+                <Input name="address" value={form.address} onChange={handleChange} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Общая площадь (м²)</label>
+                <Input type="number" name="totalArea" value={form.totalArea} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Площадь зала (м²)</label>
+                <Input type="number" name="hallArea" value={form.hallArea} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Посадочных мест</label>
+                <Input type="number" name="seats" value={form.seats} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Сотрудников</label>
+                <Input type="number" name="staffCount" value={form.staffCount} onChange={handleChange} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Выручка в месяц (₽)</label>
+                <Input type="number" name="revenue" value={form.revenue} onChange={handleChange} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Средний чек (₽)</label>
+                <Input type="number" name="avgCheck" value={form.avgCheck} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Аренда (₽)</label>
+                <Input type="number" name="rent" value={form.rent} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Коммунальные (₽)</label>
+                <Input type="number" name="utilities" value={form.utilities} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">ФОТ (₽)</label>
+                <Input type="number" name="payroll" value={form.payroll} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Управление (₽)</label>
+                <Input type="number" name="managementCosts" value={form.managementCosts} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Себестоимость (₽)</label>
+                <Input type="number" name="costOfGoods" value={form.costOfGoods} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Прочие расходы (₽)</label>
+                <Input type="number" name="otherExpenses" value={form.otherExpenses} onChange={handleChange} />
+              </div>
+            </div>
+            {error && <div className="bg-destructive/10 text-destructive p-3 rounded text-sm">{error}</div>}
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Анализируем...' : 'Получить рекомендации'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {result && (
-        <div className="mt-8 space-y-6">
-          <div className="bg-green-50 p-4 rounded">
-            <h2 className="text-xl font-bold">Аудит</h2>
-            <div className="whitespace-pre-line">
-              {result.auditSummary}
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 text-sm">
-              <p><strong>Выручка на сотрудника:</strong> {result.metrics.revenuePerEmployee.toFixed(0)} ₽</p>
-              <p><strong>Выручка на место:</strong> {result.metrics.revenuePerSeat.toFixed(0)} ₽</p>
-              <p><strong>Выручка на м²:</strong> {result.metrics.revenuePerSqM.toFixed(0)} ₽</p>
-              <p><strong>Food cost:</strong> {result.metrics.foodCostPercent}%</p>
-              <p><strong>ФОТ:</strong> {result.metrics.payrollPercent}%</p>
-              <p><strong>Аренда:</strong> {result.metrics.rentPercent}%</p>
-              <p><strong>Прибыль:</strong> {result.metrics.profitPercent}%</p>
-            </div>
+        <div className="space-y-6">
+          {/* Ключевые метрики */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="border-l-4 border-l-primary">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Прибыль, %</p>
+                  <p className="text-lg font-bold">{result.metrics.profitPercent}%</p>
+                </div>
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-emerald-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Выручка/сотр</p>
+                  <p className="text-lg font-bold">{Math.round(result.metrics.revenuePerEmployee).toLocaleString()} ₽</p>
+                </div>
+                <Users className="h-5 w-5 text-emerald-500" />
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-amber-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Food cost</p>
+                  <p className="text-lg font-bold">{result.metrics.foodCostPercent}%</p>
+                </div>
+                <DollarSign className="h-5 w-5 text-amber-500" />
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-red-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">ФОТ, %</p>
+                  <p className="text-lg font-bold">{result.metrics.payrollPercent}%</p>
+                </div>
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded">
-              <h3 className="font-bold">Развитие</h3>
-              <ul className="list-disc pl-5 text-sm">
-                {result.recommendations.development.map((item: string, i: number) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="bg-yellow-50 p-4 rounded">
-              <h3 className="font-bold">Менеджмент</h3>
-              <ul className="list-disc pl-5 text-sm">
-                {result.recommendations.management.map((item: string, i: number) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="bg-purple-50 p-4 rounded">
-              <h3 className="font-bold">Реклама</h3>
-              <ul className="list-disc pl-5 text-sm">
-                {result.recommendations.advertising.map((item: string, i: number) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="bg-red-50 p-4 rounded">
-              <h3 className="font-bold">Финансы</h3>
-              <ul className="list-disc pl-5 text-sm">
-                {result.recommendations.finance.map((item: string, i: number) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          {/* Аудит */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Сводка аудита</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="whitespace-pre-line text-sm">{result.auditSummary}</p>
+            </CardContent>
+          </Card>
 
-          <div className="bg-gray-100 p-4 rounded">
-            <h3 className="font-bold">Чек-листы</h3>
-            {result.checklists.map((list: any, idx: number) => (
-              <div key={idx} className="mt-2">
-                <p className="font-semibold">{list.title}</p>
-                <ul className="list-disc pl-5 text-sm">
-                  {list.items.map((item: string, i: number) => (
-                    <li key={i}>{item}</li>
-                  ))}
-                </ul>
-              </div>
+          {/* Рекомендации */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(result.recommendations).map(([key, items]) => (
+              <Card key={key}>
+                <CardHeader>
+                  <CardTitle className="capitalize">{key}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {(items as string[]).map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
-          <div className="bg-gray-100 p-4 rounded">
-            <h3 className="font-bold">Рекламные ресурсы</h3>
-            {result.adResources.map((res: any, idx: number) => (
-              <div key={idx} className="mt-2">
-                <a href={res.link} target="_blank" rel="noopener" className="text-blue-600 underline">
-                  {res.name}
-                </a>
-                <span className="text-gray-600"> — {res.description}</span>
-              </div>
-            ))}
-          </div>
+          {/* Чек-листы */}
+          {result.checklists?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Чек-листы</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {result.checklists.map((list: any, idx: number) => (
+                  <div key={idx} className="mb-4 last:mb-0">
+                    <h4 className="font-semibold text-sm">{list.title}</h4>
+                    <ul className="list-disc pl-5 text-sm">
+                      {list.items.map((item: string, i: number) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Рекламные ресурсы */}
+          {result.adResources?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Рекламные ресурсы</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {result.adResources.map((res: any, idx: number) => (
+                  <div key={idx} className="mb-2 last:mb-0">
+                    <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">
+                      {res.name}
+                    </a>
+                    <span className="text-sm text-muted-foreground"> — {res.description}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
-    </main>
+    </div>
   );
 }
