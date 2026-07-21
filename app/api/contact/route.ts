@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Получаем IP отправителя
     const forwarded = request.headers.get('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',')[0].trim() : request.ip || 'unknown';
+    const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
 
     // 2. Проверяем лимит
     const now = Date.now();

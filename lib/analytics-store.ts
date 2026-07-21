@@ -36,7 +36,7 @@ export async function trackEvent(e: Omit<TrackedEvent, 'id' | 'timestamp'>): Pro
       path: e.path,
       sessionId: e.sessionId,
       timestamp: BigInt(Date.now()),
-      data: e.data,
+      data: JSON.parse(JSON.stringify(e.data)),
     },
   });
   return {

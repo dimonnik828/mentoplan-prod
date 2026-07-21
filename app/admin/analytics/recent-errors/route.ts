@@ -1,19 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { getRecentErrors } from '@/lib/analytics-store';
 
-const prisma = new PrismaClient();
-
-export async function GET(request: NextRequest) {
-  return apiHandler({
-    request,
-    handler: async () => {
-      const errors = await prisma.analyticsEvent.findMany({
-        where: { type: 'error' },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      });
-      return NextResponse.json(errors);
-    },
-  });
+export async function GET() {
+  try {
+    const errors = await getRecentErrors(10);
+    return NextResponse.json(errors);
+  } catch (error) {
+    console.error('Recent errors route error:', error);
+    return NextResponse.json({ error: 'Failed to fetch recent errors' }, { status: 500 });
+  }
 }

@@ -1,25 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { getAttackAttempts } from '@/lib/analytics-store';
 
-const prisma = new PrismaClient();
-
-export async function GET(request: NextRequest) {
-  return apiHandler({
-    request,
-    handler: async () => {
-      const attacks = await prisma.analyticsEvent.findMany({
-        where: { type: 'attack' },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-        select: {
-          id: true,
-          page: true,
-          data: true,
-          createdAt: true,
-        },
-      });
-      return NextResponse.json(attacks);
-    },
-  });
+export async function GET() {
+  try {
+    const attacks = await getAttackAttempts(10);
+    return NextResponse.json(attacks);
+  } catch (error) {
+    console.error('Attacks route error:', error);
+    return NextResponse.json({ error: 'Failed to fetch attacks' }, { status: 500 });
+  }
 }

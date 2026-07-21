@@ -1,20 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { getBehaviorData } from '@/lib/analytics-store';
 
-const prisma = new PrismaClient();
-
-export async function GET(request: NextRequest) {
-  return apiHandler({
-    request,
-    handler: async () => {
-      const clicks = await prisma.analyticsEvent.findMany({
-        where: { type: 'click' },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        select: { id: true, page: true, data: true, createdAt: true },
-      });
-      return NextResponse.json(clicks);
-    },
-  });
+export async function GET() {
+  try {
+    const data = await getBehaviorData();
+    const clicks = (data.clickHeatmap || []).slice(0, 20).map(item => ({
+      id: `${item.path}-${item.element}`,
+      page: item.path,
+      element: item.element,
+      count: item.count,
+    }));
+    return NextResponse.json(clicks);
+  } catch (error) {
+    console.error('Recent clicks route error:', error);
+    return NextResponse.json({ error: 'Failed to fetch recent clicks' }, { status: 500 });
+  }
 }

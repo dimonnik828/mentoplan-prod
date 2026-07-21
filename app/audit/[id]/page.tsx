@@ -57,9 +57,9 @@ function AttentionZoneCard({ zone }: { zone: any }) {
     opportunity: 'Возможность',
   };
   return (
-    <div className={`border-l-4 p-4 rounded-md ${statusColors[zone.status]}`}>
+    <div className={`border-l-4 p-4 rounded-md ${statusColors[zone.status as keyof typeof statusColors]}`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 uppercase">{statusText[zone.status]}</span>
+        <span className="text-xs font-medium text-gray-500 uppercase">{statusText[zone.status as keyof typeof statusText]}</span>
         <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">Разобрать</button>
       </div>
       <h4 className="font-semibold text-gray-900 mt-1">{zone.title}</h4>

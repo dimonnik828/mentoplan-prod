@@ -58,15 +58,32 @@ interface LocationSettings {
   conversionRate: number;
   potentialGuests: number;
 }
-
 interface DashboardData {
-  name?: string; address?: string; venueType?: string;
-  totalArea?: number; hallArea?: number; seats?: number; staffCount?: number;
-  monthlyRevenue?: number; revenue?: number; avgCheck?: number;
-  rent?: number; utilities?: number; fot?: number; payroll?: number;
-  managementCost?: number; costOfGoods?: number; otherExpenses?: number;
-  foodCostPercent?: number; drinkCostPercent?: number;
+  name?: string;
+  address?: string;
+  venueType?: string;
+  totalArea?: number;
+  hallArea?: number;
+  seats?: number;
+  staffCount?: number;
+  monthlyRevenue?: number;
+  revenue?: number;
+  avgCheck?: number;
+  rent?: number;
+  utilities?: number;
+  fot?: number;
+  payroll?: number;
+  managementCost?: number;
+  management?: number;
+  costOfGoods?: number;
+  foodCost?: number;
+  cogs?: number;
+  otherExpenses?: number;
+  foodCostPercent?: number;
+  drinkCostPercent?: number;
+  other?: number;
 }
+
 
 /* ============================================================
    КОНСТАНТЫ
@@ -240,7 +257,7 @@ function SelectField({ label, value, onChange, options }: {
   return (
     <div className="mb-3 last:mb-0">
       <Label className="mb-1.5">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={(val) => onChange(val ?? '')}>
         <SelectTrigger className="w-full text-xs h-8">
           <SelectValue />
         </SelectTrigger>

@@ -167,7 +167,6 @@ export default function AdminAnalyticsPage() {
         fetchSection('behavior'), fetchSection('processes'),
         fetchSection('behavior-timeline'),
       ]);
-      console.log('Behavior data:', beh);
       if (ov) setOverview(ov);
       if (Array.isArray(ses)) setSessions(ses);
       if (Array.isArray(pg)) setTopPages(pg);
@@ -229,7 +228,7 @@ export default function AdminAnalyticsPage() {
   return (
     <ErrorBoundary>
       <div className="p-6 space-y-6">
-        {/* Header: всё в одной строке */}
+        {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold text-foreground">Аналитика и безопасность</h1>
@@ -239,7 +238,6 @@ export default function AdminAnalyticsPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Вкладки */}
             {[
               { key: 'overview', label: 'Обзор', icon: LayoutDashboard },
               { key: 'behavior', label: 'Поведение', icon: MousePointer },
@@ -437,7 +435,6 @@ export default function AdminAnalyticsPage() {
         {tab === 'behavior' && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Click Heatmap */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -481,7 +478,6 @@ export default function AdminAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Navigation Flow */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -507,7 +503,6 @@ export default function AdminAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Page Durations */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -535,7 +530,6 @@ export default function AdminAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Action Frequency */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -559,7 +553,6 @@ export default function AdminAnalyticsPage() {
               </Card>
             </div>
 
-            {/* Динамика за 30 дней */}
             <div className="mt-6">
               <Card>
                 <CardHeader className="pb-3">
@@ -636,7 +629,6 @@ export default function AdminAnalyticsPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Slowest Pages */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -668,7 +660,6 @@ export default function AdminAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Performance Log */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -700,7 +691,6 @@ export default function AdminAnalyticsPage() {
         {/* ═══════ SECURITY ═══════ */}
         {tab === 'security' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Errors */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -726,7 +716,7 @@ export default function AdminAnalyticsPage() {
                       </div>
                       <p className="text-xs text-foreground break-all">{String(e.data?.message ?? '') || 'Неизвестная ошибка'}</p>
                       {e.path && <p className="text-xs text-muted-foreground font-mono">{e.path}</p>}
-                      {e.data?.lineno && (
+                      {Boolean(e.data?.lineno) && (
                         <p className="text-[11px] text-muted-foreground">Строка {String(e.data.lineno)}:{String(e.data.colno)} — {String(e.data.filename || '').split('/').pop()}</p>
                       )}
                     </div>
@@ -735,7 +725,6 @@ export default function AdminAnalyticsPage() {
               </CardContent>
             </Card>
 
-            {/* Attacks */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -760,7 +749,7 @@ export default function AdminAnalyticsPage() {
                         <span className="text-[11px] text-muted-foreground tabular-nums">{fmtTs(a.timestamp)}</span>
                       </div>
                       <p className="text-xs text-foreground">{String(a.data?.reason ?? a.data?.event ?? '') || 'Подозрительная активность'}</p>
-                      {a.data?.ip && <p className="text-xs text-muted-foreground font-mono">IP: {String(a.data.ip)}</p>}
+                      {Boolean(a.data?.ip) && <p className="text-xs text-muted-foreground font-mono">IP: {String(a.data.ip)}</p>}
                     </div>
                   ))
                 )}
@@ -773,7 +762,7 @@ export default function AdminAnalyticsPage() {
         {tab === 'processes' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 flex-wrap">
-              <Select value={procFilter} onValueChange={setProcFilter}>
+              <Select value={procFilter} onValueChange={(value) => setProcFilter(value ?? 'all')}>
                 <SelectTrigger className="w-48 h-8 text-xs">
                   <SelectValue placeholder="Тип событий" />
                 </SelectTrigger>

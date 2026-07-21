@@ -10,7 +10,7 @@ async function getSessionId(): Promise<string> {
   const res = await fetch('/api/analytics');
   const data = await res.json();
   sessionId = data.sessionId;
-  return sessionId;
+  return sessionId ?? '';
 }
 
 async function sendEvent(type: string, page?: string, data?: any) {

@@ -479,7 +479,7 @@ function DataModal({
                           <Label>{FIELD_LABELS[f]}</Label>
                           <Select
                             value={String(form[f] ?? '')}
-                            onValueChange={(v) => set(f, v)}
+                            onValueChange={(v) => set(f, v ?? '')}
                           >
                             <SelectTrigger className="w-full">
                               <SelectValue />

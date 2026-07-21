@@ -1,18 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { getSessions } from '@/lib/analytics-store';
 
-const prisma = new PrismaClient();
-
-export async function GET(request: NextRequest) {
-  return apiHandler({
-    request,
-    handler: async () => {
-      const sessions = await prisma.analyticsSession.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      });
-      return NextResponse.json(sessions);
-    },
-  });
+export async function GET() {
+  try {
+    const sessions = getSessions();
+    return NextResponse.json(sessions);
+  } catch (error) {
+    console.error('Sessions route error:', error);
+    return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
+  }
 }

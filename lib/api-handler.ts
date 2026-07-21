@@ -38,17 +38,12 @@ async function recordAttack(request: NextRequest, reason: string) {
       'unknown';
     const systemSessionId = '00000000-0000-0000-0000-000000000000';
 
-    await prisma.analyticsSession.upsert({
-      where: { id: systemSessionId },
-      create: { id: systemSessionId, ip: 'system' },
-      update: {},
-    });
 
     await prisma.analyticsEvent.create({
       data: {
         sessionId: systemSessionId,
         type: 'attack',
-        page: request.url,
+        path: request.url,
         data: {
           ip,
           reason,
