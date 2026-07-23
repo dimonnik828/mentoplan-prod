@@ -5,6 +5,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { HeaderNav } from "@/components/header-nav";
 import { AnalyticsProvider } from "@/components/AnalyticsProvider";
+import { CookieBanner } from "@/components/CookieBanner";
 import Script from "next/script";
 
 const geistSans = Geist({
@@ -107,6 +108,9 @@ export default function RootLayout({
             />
           </div>
         </noscript>
+
+        {/* Cookie-баннер */}
+        <CookieBanner />
       </body>
     </html>
   );

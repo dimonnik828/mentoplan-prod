@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { FirstVisitOverlay } from '@/components/FirstVisitOverlay'; // добавлено
 
 /* ==================================================================
    ТИПЫ
@@ -729,6 +730,9 @@ export default function DashboardClient() {
 
   return (
     <ErrorBoundary>
+      {/* Онбординг для нового пользователя — подсвечиваем кнопку «Изменить данные» */}
+      <FirstVisitOverlay targetSelector="#edit-data-btn" />
+
       <div className="p-6 lg:p-8 max-w-[1200px] mx-auto">
         {/* ---- Шапка ---- */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
@@ -742,9 +746,9 @@ export default function DashboardClient() {
               {VENUE_LABELS[businessData.venueType] ?? businessData.venueType}
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} size="sm">
+          <Button id="edit-data-btn" onClick={() => setIsModalOpen(true)} size="sm">
             <Edit className="h-4 w-4" />
-            Изменить данные
+            Ввести данные
           </Button>
         </div>
 
