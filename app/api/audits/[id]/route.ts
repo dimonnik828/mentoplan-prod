@@ -10,12 +10,12 @@ export async function GET(
   try {
     const { id } = await params;
     const audit = await prisma.audit.findUnique({ where: { id } });
-    if (!audit) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
+    if (!audit) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(audit);
   } catch (error) {
     console.error('Audit GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// PUT и DELETE можно добавить по аналогии, если нужны, пока оставим только GET

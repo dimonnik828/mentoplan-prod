@@ -27,10 +27,7 @@ export async function PUT(
     const body = await request.json();
     const updated = await prisma.category.update({
       where: { id },
-      data: {
-        name: body.name,
-        parentId: body.parentId,
-      },
+      data: { name: body.name, parentId: body.parentId },
     });
     return NextResponse.json(updated);
   } catch (error) {

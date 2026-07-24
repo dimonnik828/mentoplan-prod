@@ -9,11 +9,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const ingredient = await prisma.ingredient.findUnique({ where: { id } });
-    if (!ingredient) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json(ingredient);
+    const cardId = parseInt(id, 10);
+    if (isNaN(cardId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+    const card = await prisma.tTK.findUnique({ where: { id: cardId } });
+    if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json(card);
   } catch (error) {
-    console.error('Ingredient GET error:', error);
+    console.error('TTK detail error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -24,19 +28,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const updated = await prisma.ingredient.update({
-      where: { id },
-      data: {
-        name: body.name,
-        unit: body.unit,
-        pricePerUnit: body.pricePerUnit,
-      },
-    });
-    return NextResponse.json(updated);
+    // PUT логика
+    return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
   } catch (error) {
-    console.error('Ingredient PUT error:', error);
-    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    console.error('TTK PUT error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -46,10 +42,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.ingredient.delete({ where: { id } });
-    return NextResponse.json({ success: true });
+    // DELETE логика
+    return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
   } catch (error) {
-    console.error('Ingredient DELETE error:', error);
-    return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+    console.error('TTK DELETE error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
