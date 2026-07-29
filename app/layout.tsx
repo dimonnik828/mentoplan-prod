@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "MOMENTO — Аналитика ресторанного бизнеса",
   description: "Экспресс-аудит и аналитика показателей ресторана",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.ico",
   },
   openGraph: {
     title: "MOMENTO — Аналитика ресторанного бизнеса",
