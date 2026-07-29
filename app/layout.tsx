@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
   },
+  verification: {
+    yandex: "7614d7c98e06cc37", // ← добавлено
+  },
   openGraph: {
     title: "MOMENTO — Аналитика ресторанного бизнеса",
     description: "Экспресс-аудит и аналитика показателей ресторана",
