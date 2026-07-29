@@ -11,13 +11,13 @@ export async function POST(request: Request) {
     if (password === process.env.ADMIN_PASSWORD) {
       // Важно: cookies() возвращает Promise, нужно await
       const cookieStore = await cookies();
-      cookieStore.set('admin_token', 'true', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 60 * 60, // 1 час
-      });
+        cookieStore.set('admin_token', 'true', {
+          httpOnly: true,
+          secure: false,          // ← HTTP
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 60 * 60,
+        });
       return NextResponse.json({ success: true });
     }
 

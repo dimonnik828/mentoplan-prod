@@ -148,14 +148,14 @@ export default function AdminAnalyticsPage() {
   const [timeline, setTimeline] = useState<any[]>([]);
 
   const fetchSection = useCallback(async (section: string) => {
-    try {
-      const r = await fetch(`/api/admin/analytics/data?section=${section}`, {
-        headers: { 'x-admin-token': process.env.NEXT_PUBLIC_ADMIN_TOKEN || '' },
-      });
-      if (!r.ok) throw new Error('Unauthorized');
-      const t = await r.text();
-      try { return JSON.parse(t); } catch { return null; }
-    } catch { return null; }
+  try {
+    const r = await fetch(`/api/admin/analytics/data?section=${section}`, {
+      credentials: 'same-origin',   // <-- добавлено
+    });
+    if (!r.ok) throw new Error('Unauthorized');
+    const t = await r.text();
+    try { return JSON.parse(t); } catch { return null; }
+  } catch { return null; }
   }, []);
 
   const reload = useCallback(async () => {
