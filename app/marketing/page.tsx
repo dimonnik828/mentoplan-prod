@@ -12,6 +12,10 @@ export const generateMetadata = (): Metadata => ({
     'как привлечь гостей в кафе',
     'управление акциями ресторана',
   ],
+  robots: {
+    index: false,
+    follow: false,
+  },
   openGraph: {
     title: 'Маркетинг и гости | MOMENTO',
     description: 'Инструменты для продвижения и удержания клиентов.',
