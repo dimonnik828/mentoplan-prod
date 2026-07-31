@@ -104,7 +104,7 @@ export const getHealthMetrics = (): MetricConfig[] => {
 };
 
 // НОВОЕ: Функция, которая возвращает готовый массив для блока "Решения"
-export const getRecommendations = (data: Record<string, number>) => {
+export const getRecommendations = (data: Record<string, any>) => {
   const recommendations: {
     colorLevel: 'green' | 'orange' | 'red';
     title: string;
