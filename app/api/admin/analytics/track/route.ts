@@ -8,12 +8,6 @@ import {
 } from '@/lib/analytics-store';
 
 export async function POST(request: NextRequest) {
-  // ─── Проверка авторизации (даже если уже стоит middleware, дублируем) ───
-  const token = request.headers.get('x-admin-token');
-  if (token !== process.env.ADMIN_API_TOKEN) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const body = await request.json();
     const { events } = body as { events: Record<string, unknown>[] };
@@ -43,7 +37,6 @@ export async function POST(request: NextRequest) {
           startSession(sessionId, '');
         }
 
-        // trackEvent асинхронный, поэтому используем await, чтобы не пропустить ошибки
         await trackEvent({
           type: type as any,
           path,

@@ -11,7 +11,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   const pathname = usePathname();
 
   // Отключаем аналитику на страницах логина и аналитики
-  const isAdminPage = pathname === '/admin/login' || pathname.startsWith('/admin/analytics');
+  const isAdminPage = pathname.startsWith('/admin');
 
   if (isAdminPage) {
     return (

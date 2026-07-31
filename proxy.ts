@@ -13,9 +13,13 @@ export default function proxy(request: NextRequest) {
     }
   }
 
-  // Защита API /api/admin/* (кроме /api/admin/login)
-  if (pathname.startsWith('/api/admin/') && !pathname.startsWith('/api/admin/login')) {
-    const token = request.cookies.get('admin_token')?.value;   // ← теперь кука
+  // Защита API /api/admin/* (кроме /api/admin/login и /api/admin/analytics/track)
+  if (
+    pathname.startsWith('/api/admin/') &&
+    !pathname.startsWith('/api/admin/login') &&
+    !pathname.startsWith('/api/admin/analytics/track')
+  ) {
+    const token = request.cookies.get('admin_token')?.value;
     if (token !== 'true') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

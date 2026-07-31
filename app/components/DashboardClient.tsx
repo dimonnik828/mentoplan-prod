@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { FirstVisitOverlay } from '@/components/FirstVisitOverlay'; // добавлено
+import { METRICS_CONFIG, getHealthMetrics, getRecommendations } from '@/lib/metrics-config';
 
 /* ==================================================================
    ТИПЫ
@@ -82,39 +83,39 @@ type BusinessData = {
    ================================================================== */
 
 const defaultBusiness: BusinessData = {
-  name: 'Кафе MOMENTO на Тверской',
-  address: 'Москва, ул. Тверская, 10',
-  venueType: 'cafe',
-  totalArea: 110,
-  hallArea: 80,
-  seats: 48,
-  staffCount: 12,
-  dailyGuests: 50,
-  avgCheck: 1050,
-  revenue: 3200000,
-  rent: 576000,
-  utilities: 48000,
-  payroll: 864000,
-  managementCosts: 150000,
-  costOfGoods: 1088000,
-  otherExpenses: 352000,
-  operatingProfit: 320000,
-  foodCostPercent: 34,
-  payrollPercent: 27,
-  rentPercent: 18,
-  utilitiesPercent: 1.5,
-  managementPercent: 4.7,
-  otherPercent: 11,
-  profitPercent: 10,
-  healthIndex: 62,
+  name: '',
+  address: '',
+  venueType: 'cafe', // Оставляем 'cafe', чтобы селект по умолчанию не был пустым
+  totalArea: 0,
+  hallArea: 0,
+  seats: 0,
+  staffCount: 0,
+  dailyGuests: 0,
+  avgCheck: 0,
+  revenue: 0,
+  rent: 0,
+  utilities: 0,
+  payroll: 0,
+  managementCosts: 0,
+  costOfGoods: 0,
+  otherExpenses: 0,
+  operatingProfit: 0,
+  foodCostPercent: 0,
+  payrollPercent: 0,
+  rentPercent: 0,
+  utilitiesPercent: 0,
+  managementPercent: 0,
+  otherPercent: 0,
+  profitPercent: 0,
+  healthIndex: 0,
 };
 
 /* ==================================================================
    УТИЛИТЫ
    ================================================================== */
 
-const formatPercent = (value: number): string => value.toFixed(2);
-const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
+const formatPercent = (value: number): string => value === 0 ? '—' : value.toFixed(2);
+const fmt = (n: number) => n === 0 ? '—' : Math.round(n).toLocaleString('ru-RU');
 
 const VENUE_LABELS: Record<string, string> = {
   cafe: 'Кафе',
@@ -129,25 +130,19 @@ const VENUE_LABELS: Record<string, string> = {
    НОРМЫ И ЦВЕТА
    ================================================================== */
 
-const NORMS: Record<string, { green: number; orange: number; red: number; higherIsBetter?: boolean }> = {
-  foodCostPercent: { green: 32, orange: 38, red: 38 },
-  payrollPercent: { green: 25, orange: 30, red: 30 },
-  rentPercent: { green: 14, orange: 18, red: 18 },
-  profitPercent: { green: 15, orange: 10, red: 10, higherIsBetter: true },
-};
-
 type ColorLevel = 'green' | 'orange' | 'red' | 'neutral';
 
 const getColorLevel = (key: string, value: number): { color: ColorLevel; css: string } => {
-  const norm = NORMS[key];
-  if (!norm) return { color: 'neutral', css: '#6b7280' };
-  if (norm.higherIsBetter) {
-    if (value >= norm.green) return { color: 'green', css: '#10b981' };
-    if (value >= norm.orange) return { color: 'orange', css: '#f59e0b' };
+  const config = METRICS_CONFIG[key];
+  if (!config || !config.affectsHealth) return { color: 'neutral', css: '#6b7280' }; // Если нет нормы — серый
+
+  if (config.higherIsBetter) {
+    if (value >= config.green) return { color: 'green', css: '#10b981' };
+    if (value >= config.orange) return { color: 'orange', css: '#f59e0b' };
     return { color: 'red', css: '#ef4444' };
   } else {
-    if (value <= norm.green) return { color: 'green', css: '#10b981' };
-    if (value <= norm.orange) return { color: 'orange', css: '#f59e0b' };
+    if (value <= config.green) return { color: 'green', css: '#10b981' };
+    if (value <= config.orange) return { color: 'orange', css: '#f59e0b' };
     return { color: 'red', css: '#ef4444' };
   }
 };
@@ -174,17 +169,23 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const operatingProfit = revenue - rent - utilities - payroll - managementCosts - costOfGoods - otherExpenses;
   const profitPercent = revenue ? Math.round((operatingProfit / revenue) * 100) : 0;
 
-  const params: [string, number][] = [
-    ['foodCostPercent', foodCostPercent],
-    ['payrollPercent', payrollPercent],
-    ['rentPercent', rentPercent],
-    ['profitPercent', profitPercent],
-  ];
+  // ИСПРАВЛЕНИЕ: Собираем рассчитанные проценты в один объект
+  const calculatedPercents = {
+    foodCostPercent,
+    payrollPercent,
+    rentPercent,
+    profitPercent,
+  };
+
+  // НОВОЕ: Берем динамический список метрик из конфига
+  const healthMetrics = getHealthMetrics();
   let greenCount = 0;
-  params.forEach(([key, val]) => {
-    if (getColorLevel(key, val).color === 'green') greenCount++;
+  healthMetrics.forEach((metric) => {
+   // Берем значение ИЗ РАССЧИТАННЫХ ПЕРЕМЕННЫХ
+   const val = calculatedPercents[metric.key as keyof typeof calculatedPercents] ?? 0;
+    if (getColorLevel(metric.key, val).color === 'green') greenCount++;
   });
-  const healthIndex = Math.round((greenCount / params.length) * 100);
+  const healthIndex = healthMetrics.length > 0 ? Math.round((greenCount / healthMetrics.length) * 100) : 0;
 
   return {
     ...defaultBusiness,
@@ -622,7 +623,7 @@ export default function DashboardClient() {
     }
   };
 
-  const kpis = useMemo(
+    const kpis = useMemo(
     () => [
       {
         icon: Wallet,
@@ -642,76 +643,20 @@ export default function DashboardClient() {
         icon: UtensilsCrossed,
         label: 'Food cost',
         value: `${formatPercent(businessData.foodCostPercent)}%`,
-        sub: businessData.foodCostPercent > 32 ? 'Выше нормы' : 'В норме',
+        sub: getColorLevel('foodCostPercent', businessData.foodCostPercent).color === 'green' ? 'В норме' : 'Выше нормы',
         colorLevel: getColorLevel('foodCostPercent', businessData.foodCostPercent).color,
       },
       {
         icon: Users,
         label: 'ФОТ',
         value: `${formatPercent(businessData.payrollPercent)}%`,
-        sub: businessData.payrollPercent > 25 ? 'Выше нормы' : 'В норме',
+        sub: getColorLevel('payrollPercent', businessData.payrollPercent).color === 'green' ? 'В норме' : 'Выше нормы',
         colorLevel: getColorLevel('payrollPercent', businessData.payrollPercent).color,
       },
     ],
     [businessData]
   );
-
-  const recommendations = useMemo(() => {
-    const items: {
-      colorLevel: ColorLevel;
-      title: string;
-      value: string;
-      description: string;
-    }[] = [];
-
-    const profitLevel = getColorLevel('profitPercent', businessData.profitPercent).color;
-    items.push({
-      colorLevel: profitLevel,
-      title: 'Операционная прибыль',
-      value: `${formatPercent(businessData.profitPercent)}%`,
-      description:
-        profitLevel === 'green'
-          ? 'Прибыль находится в целевом диапазоне. Продолжайте контролировать расходы.'
-          : profitLevel === 'orange'
-            ? `Прибыль ниже целевого уровня 15%. Рекомендуется сократить расходы примерно на ${fmt(Math.round(businessData.revenue * 0.05))} ₽/мес.`
-            : `Прибыль значительно ниже нормы 15%. Необходимо сократить расходы минимум на ${fmt(Math.round(businessData.revenue * 0.1))} ₽/мес для выхода в зелёную зону.`,
-    });
-
-    const fcLevel = getColorLevel('foodCostPercent', businessData.foodCostPercent).color;
-    items.push({
-      colorLevel: fcLevel,
-      title: 'Food cost',
-      value: `${formatPercent(businessData.foodCostPercent)}%`,
-      description:
-        fcLevel === 'green'
-          ? 'Себестоимость блюд в норме.'
-          : `Себестоимость ${formatPercent(businessData.foodCostPercent)}% при норме 28–32%. Снижение на 2% сэкономит ${fmt(Math.round(businessData.revenue * 0.02))} ₽/мес.`,
-    });
-
-    const prLevel = getColorLevel('payrollPercent', businessData.payrollPercent).color;
-    items.push({
-      colorLevel: prLevel,
-      title: 'Фонд оплаты труда',
-      value: `${formatPercent(businessData.payrollPercent)}%`,
-      description:
-        prLevel === 'green'
-          ? 'ФОТ в пределах нормы.'
-          : `ФОТ ${formatPercent(businessData.payrollPercent)}% при норме 22–25%. Оптимизация графиков на 2% сэкономит ${fmt(Math.round(businessData.revenue * 0.02))} ₽/мес.`,
-    });
-
-    const rnLevel = getColorLevel('rentPercent', businessData.rentPercent).color;
-    items.push({
-      colorLevel: rnLevel,
-      title: 'Арендная нагрузка',
-      value: `${formatPercent(businessData.rentPercent)}%`,
-      description:
-        rnLevel === 'green'
-          ? 'Аренда в допустимых пределах.'
-          : `Аренда ${formatPercent(businessData.rentPercent)}% при норме до 14%. Рассмотрите переговоры с арендодателем или увеличение выручки.`,
-    });
-
-    return items;
-  }, [businessData]);
+  const recommendations = getRecommendations(businessData);
 
   const healthColor =
     businessData.healthIndex >= 70
@@ -774,39 +719,35 @@ export default function DashboardClient() {
             <CardTitle className="text-sm font-semibold">Структура выручки</CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <ExpenseBar
-              label="Foodcost"
-              value={businessData.foodCostPercent}
-              target="→ 28–32%"
-              colorLevel={getColorLevel('foodCostPercent', businessData.foodCostPercent).color}
-            />
-            <ExpenseBar
-              label="ФОТ"
-              value={businessData.payrollPercent}
-              target="→ 22–25%"
-              colorLevel={getColorLevel('payrollPercent', businessData.payrollPercent).color}
-            />
-            <ExpenseBar
-              label="Аренда"
-              value={businessData.rentPercent}
-              target="→ до 14%"
-              colorLevel={getColorLevel('rentPercent', businessData.rentPercent).color}
-            />
-            <ExpenseBar
-              label="Коммунальные"
-              value={businessData.utilitiesPercent}
-              colorLevel="neutral"
-            />
-            <ExpenseBar
-              label="Управление"
-              value={businessData.managementPercent}
-              colorLevel="neutral"
-            />
-            <ExpenseBar
-              label="Прочие"
-              value={businessData.otherPercent}
-              colorLevel="neutral"
-            />
+            {/* ДИНАМИЧЕСКАЯ ГЕНЕРАЦИЯ ПОЛОСОК ИЗ КОНФИГА */}
+            {Object.values(METRICS_CONFIG).map((metric) => {
+              // Прибыль рисуем отдельно ниже, после разделителя, поэтому здесь её пропускаем
+              if (metric.key === 'profitPercent') return null;
+
+              // Берем значение процента из данных бизнеса
+              const value = businessData[metric.key as keyof BusinessData] ?? 0;
+
+              // Если метрика влияет на здоровье — красим по правилам, иначе всегда серая
+              const colorLevel = metric.affectsHealth
+                ? getColorLevel(metric.key, Number(value)).color
+                : 'neutral';
+
+              // Генерируем текст цели (target) только для тех метрик, у которых есть норма
+              const target = metric.affectsHealth
+                ? `${metric.higherIsBetter ? '→' : '≤'} ${metric.green}%`
+                : undefined;
+
+              return (
+                <ExpenseBar
+                  key={metric.key}
+                  label={metric.label}
+                  value={Number(value)}
+                  target={target}
+                  colorLevel={colorLevel}
+                />
+              );
+            })}
+
             <Separator className="my-2" />
             <ExpenseBar
               label="Опер. прибыль"
@@ -815,6 +756,7 @@ export default function DashboardClient() {
               colorLevel={getColorLevel('profitPercent', businessData.profitPercent).color}
             />
 
+            {/* Блок индекса здоровья оставляем как был */}
             <div className="mt-4 pt-4 border-t">
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="font-medium text-foreground">Индекс здоровья бизнеса</span>
