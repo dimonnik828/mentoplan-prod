@@ -26,6 +26,9 @@ import {
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import {
   METRICS_CONFIG, getHealthMetrics, getRecommendations, runDiagnostics, VENUE_NORMS,
@@ -212,6 +215,21 @@ function BubbleRowFromConfig({ blockId, subBlockId, data, className }: {
   );
 }
 
+function InfoPopover({ children }: { children: React.ReactNode }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-muted hover:bg-muted/80 transition-colors text-muted-foreground hover:text-foreground"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-[10px] font-bold leading-none">i</span>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-3 text-xs" side="top" align="start">
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
 function KPICard({ icon: Icon, label, value, sub, colorLevel = 'neutral' }: {
   icon: React.ElementType; label: string; value: string; sub?: string; colorLevel?: ColorLevel;
 }) {
@@ -664,38 +682,54 @@ export default function SuperDashboard() {
           </Card>
         )}
 
-        {/* Заголовок + переключатель режима */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-foreground truncate">{activeData.name || 'Аналитика'}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5 truncate">{activeData.address} · {VENUE_LABELS[activeData.venueType] ?? activeData.venueType}</p>
-          </div>
-          <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-            <button onClick={() => setViewMode('real')} className={cn('px-4 py-2 rounded-md text-sm font-medium transition-all', viewMode === 'real' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>Реальные данные</button>
-            <button onClick={() => setViewMode('model')} className={cn('px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5', viewMode === 'model' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground')}><SlidersHorizontal className="h-4 w-4" />Моделирование</button>
-          </div>
-        </div>
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
 
-        {/* KPI */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          <KPICard icon={Wallet} label={viewMode === 'model' ? 'Выручка / мес' : 'Дневная выручка'} value={viewMode === 'model' ? `${fmt(activeData.revenue)} ₽` : `${fmt(Math.round(activeData.revenue / 30))} ₽`} sub={viewMode === 'model' ? undefined : `${fmt(activeData.revenue)} ₽/мес`} colorLevel="neutral" />
-          <KPICard icon={UtensilsCrossed} label="Стоимость продуктов" value={`${formatPercent(activeData.foodCostPercent)}%`} sub={`${fmt(activeData.costOfGoods)} ₽`} colorLevel={getColorLevel('foodCostPercent', activeData.foodCostPercent).color} />
-          <KPICard icon={Building2} label="Аренда + Коммунал." value={`${formatPercent(activeData.rentPercent + activeData.utilitiesPercent)}%`} sub={`${fmt(activeData.rent + activeData.utilities)} ₽`} colorLevel={getColorLevel('rentPercent', activeData.rentPercent).color} />
-          <KPICard icon={Users} label="Сотрудников / ФОТ" value={`${activeData.staffCount} чел`} sub={`${formatPercent(activeData.payrollPercent)}%`} colorLevel={getColorLevel('payrollPercent', activeData.payrollPercent).color} />
-          <KPICard icon={Receipt} label="Прочие расходы" value={`${formatPercent(activeData.otherPercent + activeData.managementPercent)}%`} sub={`${fmt(activeData.otherExpenses + activeData.managementCosts)} ₽`} colorLevel={activeData.otherPercent > 10 ? 'orange' : 'neutral'} />
-          <KPICard icon={PiggyBank} label="Прибыль" value={`${formatPercent(activeData.profitPercent)}%`} sub={`${fmt(activeData.operatingProfit)} ₽`} colorLevel={getColorLevel('profitPercent', activeData.profitPercent).color} />
+          {/* Заголовок + переключатель режима */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-foreground truncate">{activeData.name || 'Аналитика'}</h1>
+              <p className="text-sm text-muted-foreground mt-0.5 truncate">{activeData.address} · {VENUE_LABELS[activeData.venueType] ?? activeData.venueType}</p>
+            </div>
+            <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+              <button onClick={() => setViewMode('real')} className={cn('px-4 py-2 rounded-md text-sm font-medium transition-all', viewMode === 'real' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>Реальные данные</button>
+              <button onClick={() => setViewMode('model')} className={cn('px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1.5', viewMode === 'model' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground')}><SlidersHorizontal className="h-4 w-4" />Моделирование</button>
+            </div>
+          </div>
+
+          {/* KPI */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-semibold text-foreground">Ключевые показатели</span>
+                <InfoPopover>
+                  <BubbleRowFromConfig blockId="kpi" data={bubbleData} />
+                </InfoPopover>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <KPICard icon={Wallet} label={viewMode === 'model' ? 'Выручка / мес' : 'Дневная выручка'} value={viewMode === 'model' ? `${fmt(activeData.revenue)} ₽` : `${fmt(Math.round(activeData.revenue / 30))} ₽`} sub={viewMode === 'model' ? undefined : `${fmt(activeData.revenue)} ₽/мес`} colorLevel="neutral" />
+                <KPICard icon={UtensilsCrossed} label="Стоимость продуктов" value={`${formatPercent(activeData.foodCostPercent)}%`} sub={`${fmt(activeData.costOfGoods)} ₽`} colorLevel={getColorLevel('foodCostPercent', activeData.foodCostPercent).color} />
+                <KPICard icon={Building2} label="Аренда + Коммунал." value={`${formatPercent(activeData.rentPercent + activeData.utilitiesPercent)}%`} sub={`${fmt(activeData.rent + activeData.utilities)} ₽`} colorLevel={getColorLevel('rentPercent', activeData.rentPercent).color} />
+                <KPICard icon={Users} label="Сотрудников / ФОТ" value={`${activeData.staffCount} чел`} sub={`${formatPercent(activeData.payrollPercent)}%`} colorLevel={getColorLevel('payrollPercent', activeData.payrollPercent).color} />
+                <KPICard icon={Receipt} label="Прочие расходы" value={`${formatPercent(activeData.otherPercent + activeData.managementPercent)}%`} sub={`${fmt(activeData.otherExpenses + activeData.managementCosts)} ₽`} colorLevel={activeData.otherPercent > 10 ? 'orange' : 'neutral'} />
+                <KPICard icon={PiggyBank} label="Прибыль" value={`${formatPercent(activeData.profitPercent)}%`} sub={`${fmt(activeData.operatingProfit)} ₽`} colorLevel={getColorLevel('profitPercent', activeData.profitPercent).color} />
+              </div>
+            </div>
+
         </div>
-        <BubbleRowFromConfig blockId="kpi" data={bubbleData} />
+        {/* Конец Sticky Header */}
 
         {/* ============================================================
-            БЛОК 0: ДИАГНОСТИКА И ТОЧКИ РОСТА (САМЫЙ ВЕРХ)
-            ============================================================ */}
+    БЛОК 0: ДИАГНОСТИКА И ТОЧКИ РОСТА (САМЫЙ ВЕРХ)
+    ============================================================ */}
         {diagnostics && (
           <Card className="mb-6 py-0 gap-0">
             <CardHeader className="pb-0">
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-red-500" />
                 <CardTitle className="text-lg font-bold">Диагностика и точки роста</CardTitle>
+                <InfoPopover>
+                  <BubbleRowFromConfig blockId="diagnostics" data={bubbleData} />
+                </InfoPopover>
               </div>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
@@ -722,14 +756,13 @@ export default function SuperDashboard() {
                   </CardContent>
                 </Card>
               </div>
-              <BubbleRowFromConfig blockId="diagnostics" data={bubbleData} />
             </CardContent>
           </Card>
         )}
 
         {/* ============================================================
-            БЛОК 1: ВОЗМОЖНОСТИ (СВОРАЧИВАЕМЫЙ)
-            ============================================================ */}
+    БЛОК 1: ВОЗМОЖНОСТИ (СВОРАЧИВАЕМЫЙ)
+    ============================================================ */}
         {(recommendations.length > 0 || diagnostics) && (
           <Accordion type="single" defaultValue="possibilities" className="mb-6">
             <AccordionItem value="possibilities" className="border rounded-lg bg-card">
@@ -742,6 +775,14 @@ export default function SuperDashboard() {
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
                 <div className="space-y-3 pt-2">
+                  {/* InfoPopover перенесён сюда */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-muted-foreground">Справка:</span>
+                    <InfoPopover>
+                      <BubbleRowFromConfig blockId="possibilities" data={bubbleData} />
+                    </InfoPopover>
+                  </div>
+
                   {recommendations.map((r) => (
                     <div key={r.title} className="flex items-start gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
                       <div className={cn('p-1.5 rounded-md shrink-0 mt-0.5',
@@ -800,8 +841,8 @@ export default function SuperDashboard() {
         )}
 
         {/* ============================================================
-            БЛОК 2: СТРУКТУРА ВЫРУЧКИ (СВОРАЧИВАЕМЫЙ)
-            ============================================================ */}
+    БЛОК 2: СТРУКТУРА ВЫРУЧКИ (СВОРАЧИВАЕМЫЙ)
+    ============================================================ */}
         <Accordion type="single" defaultValue="revenue-structure" className="mb-6">
           <AccordionItem value="revenue-structure" className="border rounded-lg bg-card">
             <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -812,6 +853,14 @@ export default function SuperDashboard() {
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="pt-2 space-y-1">
+                {/* InfoPopover перенесён сюда */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs text-muted-foreground">Справка:</span>
+                  <InfoPopover>
+                    <BubbleRowFromConfig blockId="revenue-structure" data={bubbleData} />
+                  </InfoPopover>
+                </div>
+
                 {Object.values(METRICS_CONFIG).map((metric) => {
                   if (metric.key === 'profitPercent') return null;
                   const value = activeData[metric.key as keyof BusinessData] ?? 0;
@@ -834,7 +883,6 @@ export default function SuperDashboard() {
                   </p>
                 </div>
               </div>
-              <BubbleRowFromConfig blockId="revenue-structure" data={bubbleData} />
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -854,67 +902,79 @@ export default function SuperDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Тип заведения */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><Store className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Тип заведения</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <SelectField label="" value={hall.venueType} onChange={(v) => setHall((p) => ({ ...p, venueType: v }))} options={Object.entries(VENUE_TYPES).map(([k, v]) => ({ value: k, label: v.label }))} />
+                <div className="flex items-center gap-2">
+                  <Store className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Тип заведения</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="venue-type" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <SelectField label="" value={hall.venueType} onChange={(v) => setHall((p) => ({ ...p, venueType: v }))} options={Object.entries(VENUE_TYPES).map(([k, v]) => ({ value: k, label: v.label }))} />
                 ) : (
-                  <div><p className="text-sm font-semibold">{VENUE_LABELS[activeData.venueType] || '—'}</p><p className="text-[11px] text-muted-foreground">{activeData.totalArea > 0 ? `${activeData.totalArea} м² общая` : '—'}</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="venue-type" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{VENUE_LABELS[activeData.venueType] || '—'}</p><p className="text-[11px] text-muted-foreground">{activeData.totalArea > 0 ? `${activeData.totalArea} м² общая` : '—'}</p></div>
                 )}
               </div>
 
               {/* Помещение и аренда */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Помещение и аренда</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <div className="space-y-2">
-                      <InlineSlider label="Общая S" value={hall.totalArea} onChange={(v) => setHall((p) => ({ ...p, totalArea: v }))} max={2000} unit=" м²" />
-                      <InlineSlider label="S зала" value={hall.hallArea} onChange={(v) => setHall((p) => ({ ...p, hallArea: v }))} max={1000} unit=" м²" />
-                      <InlineSlider label="S кухни" value={hall.kitchenArea} onChange={(v) => setHall((p) => ({ ...p, kitchenArea: v }))} max={500} unit=" м²" />
-                      <InlineSlider label="Аренда / м²" value={hall.rentPerSqm} onChange={(v) => setHall((p) => ({ ...p, rentPerSqm: v }))} max={20000} step={50} unit=" ₽" />
-                    </div>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Помещение и аренда</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="premises-rent" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <div className="space-y-2">
+                    <InlineSlider label="Общая S" value={hall.totalArea} onChange={(v) => setHall((p) => ({ ...p, totalArea: v }))} max={2000} unit=" м²" />
+                    <InlineSlider label="S зала" value={hall.hallArea} onChange={(v) => setHall((p) => ({ ...p, hallArea: v }))} max={1000} unit=" м²" />
+                    <InlineSlider label="S кухни" value={hall.kitchenArea} onChange={(v) => setHall((p) => ({ ...p, kitchenArea: v }))} max={500} unit=" м²" />
+                    <InlineSlider label="Аренда / м²" value={hall.rentPerSqm} onChange={(v) => setHall((p) => ({ ...p, rentPerSqm: v }))} max={20000} step={50} unit=" ₽" />
+                  </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{fmt(activeData.rent)} ₽/мес</p><p className="text-[11px] text-muted-foreground">{activeData.totalArea} м² · {activeData.hallArea} м² зал · {activeData.seats} мест</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="premises-rent" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{fmt(activeData.rent)} ₽/мес</p><p className="text-[11px] text-muted-foreground">{activeData.totalArea} м² · {activeData.hallArea} м² зал · {activeData.seats} мест</p></div>
                 )}
               </div>
 
               {/* Зал и загрузка */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><Armchair className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Зал и загрузка</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <div className="space-y-2">
-                      <InlineSlider label="Места" value={hall.seats} onChange={(v) => setHall((p) => ({ ...p, seats: v }))} max={300} unit=" чел" />
-                      <InlineSlider label="Гостей / день" value={common.dailyGuests} onChange={(v) => setCommon((p) => ({ ...p, dailyGuests: v }))} max={500} unit=" чел" />
-                      <InlineSlider label="Средний чек" value={hall.avgCheck} onChange={(v) => handleAvgCheckChange(v)} max={10000} step={50} unit=" ₽" />
-                    </div>
+                <div className="flex items-center gap-2">
+                  <Armchair className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Зал и загрузка</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="hall-load" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <div className="space-y-2">
+                    <InlineSlider label="Места" value={hall.seats} onChange={(v) => setHall((p) => ({ ...p, seats: v }))} max={300} unit=" чел" />
+                    <InlineSlider label="Гостей / день" value={common.dailyGuests} onChange={(v) => setCommon((p) => ({ ...p, dailyGuests: v }))} max={500} unit=" чел" />
+                    <InlineSlider label="Средний чек" value={hall.avgCheck} onChange={(v) => handleAvgCheckChange(v)} max={10000} step={50} unit=" ₽" />
+                  </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{activeData.dailyGuests} чел/см</p><p className="text-[11px] text-muted-foreground">{activeData.seats} мест · Чек: {fmt(activeData.avgCheck)} ₽</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="hall-load" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{activeData.dailyGuests} чел/см</p><p className="text-[11px] text-muted-foreground">{activeData.seats} мест · Чек: {fmt(activeData.avgCheck)} ₽</p></div>
                 )}
               </div>
 
               {/* Персонал */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><UserCog className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Персонал</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <div className="space-y-2">
-                      <InlineSlider label="Повара" value={kitchen.cooks} onChange={(v) => setKitchen((p) => ({ ...p, cooks: v }))} min={1} max={20} unit=" чел" />
-                      <InlineSlider label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee((p) => ({ ...p, baristas: v }))} min={0} max={10} unit=" чел" />
-                      <InlineSlider label="Официанты" value={waitersCount} onChange={setWaitersCount} min={0} max={15} unit=" чел" />
-                      <InlineSlider label="Мойщики" value={dishwashersCount} onChange={setDishwashersCount} min={0} max={8} unit=" чел" />
-                    </div>
+                <div className="flex items-center gap-2">
+                  <UserCog className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Персонал</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="staff" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <div className="space-y-2">
+                    <InlineSlider label="Повара" value={kitchen.cooks} onChange={(v) => setKitchen((p) => ({ ...p, cooks: v }))} min={1} max={20} unit=" чел" />
+                    <InlineSlider label="Бариста" value={coffee.baristas} onChange={(v) => setCoffee((p) => ({ ...p, baristas: v }))} min={0} max={10} unit=" чел" />
+                    <InlineSlider label="Официанты" value={waitersCount} onChange={setWaitersCount} min={0} max={15} unit=" чел" />
+                    <InlineSlider label="Мойщики" value={dishwashersCount} onChange={setDishwashersCount} min={0} max={8} unit=" чел" />
+                  </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{activeData.staffCount} чел/см</p><p className="text-[11px] text-muted-foreground">ФОТ: {fmt(activeData.payroll)} ₽/мес ({formatPercent(activeData.payrollPercent)}%)</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="staff" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{activeData.staffCount} чел/см</p><p className="text-[11px] text-muted-foreground">ФОТ: {fmt(activeData.payroll)} ₽/мес ({formatPercent(activeData.payrollPercent)}%)</p></div>
                 )}
               </div>
             </div>
@@ -923,68 +983,80 @@ export default function SuperDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
               {/* Foodcost */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Foodcost</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <div className="space-y-2">
-                      <InlineSlider label="Себестоимость блюд" value={hall.foodCostPercent} onChange={(v) => setHall((p) => ({ ...p, foodCostPercent: v }))} max={60} unit=" %" />
-                      <InlineSlider label="Себестоимость напитков" value={hall.drinkCostPercent} onChange={(v) => setHall((p) => ({ ...p, drinkCostPercent: v }))} max={60} unit=" %" />
-                    </div>
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Foodcost</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="food-cost" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <div className="space-y-2">
+                    <InlineSlider label="Себестоимость блюд" value={hall.foodCostPercent} onChange={(v) => setHall((p) => ({ ...p, foodCostPercent: v }))} max={60} unit=" %" />
+                    <InlineSlider label="Себестоимость напитков" value={hall.drinkCostPercent} onChange={(v) => setHall((p) => ({ ...p, drinkCostPercent: v }))} max={60} unit=" %" />
+                  </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{fmt(activeData.costOfGoods)} ₽</p><p className="text-[11px] text-muted-foreground">{formatPercent(activeData.foodCostPercent)}% от выручки</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="food-cost" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{fmt(activeData.costOfGoods)} ₽</p><p className="text-[11px] text-muted-foreground">{formatPercent(activeData.foodCostPercent)}% от выручки</p></div>
                 )}
               </div>
 
               {/* Энергопотребление */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><Zap className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Энергопотребление</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <div className="space-y-2">
-                      <SelectField label="" value={energy.kitchenType} onChange={(v) => setEnergy((p) => ({ ...p, kitchenType: v }))} options={[{ value: 'hot', label: 'Горячая' }, { value: 'cold', label: 'Холодная' }, { value: 'mixed', label: 'Смешанная' }]} />
-                      <InlineSlider label="Тариф э/э" value={energy.electricityPrice} onChange={(v) => setEnergy((p) => ({ ...p, electricityPrice: v }))} max={20} step={0.5} unit=" ₽/кВт" />
-                      <InlineSlider label="Прочие мощности" value={energy.otherPower} onChange={(v) => setEnergy((p) => ({ ...p, otherPower: v }))} max={100} unit=" кВт" />
-                    </div>
+                <div className="flex items-center gap-2">
+                  <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Энергопотребление</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="energy" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <div className="space-y-2">
+                    <SelectField label="" value={energy.kitchenType} onChange={(v) => setEnergy((p) => ({ ...p, kitchenType: v }))} options={[{ value: 'hot', label: 'Горячая' }, { value: 'cold', label: 'Холодная' }, { value: 'mixed', label: 'Смешанная' }]} />
+                    <InlineSlider label="Тариф э/э" value={energy.electricityPrice} onChange={(v) => setEnergy((p) => ({ ...p, electricityPrice: v }))} max={20} step={0.5} unit=" ₽/кВт" />
+                    <InlineSlider label="Прочие мощности" value={energy.otherPower} onChange={(v) => setEnergy((p) => ({ ...p, otherPower: v }))} max={100} unit=" кВт" />
+                  </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{fmt(activeData.utilities)} ₽</p><p className="text-[11px] text-muted-foreground">{formatPercent(activeData.utilitiesPercent)}% от выручки</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="energy" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{fmt(activeData.utilities)} ₽</p><p className="text-[11px] text-muted-foreground">{formatPercent(activeData.utilitiesPercent)}% от выручки</p></div>
                 )}
               </div>
 
               {/* Локация */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Локация</span></div>
-                {viewMode === 'model' ? (
-                  <>
-                    <div className="space-y-2">
-                      <SelectField label="Район" value={location.district} onChange={(v) => setLocation((p) => ({ ...p, district: v }))} options={DISTRICTS} />
-                      <SelectField label="Тип локации" value={location.locationType} onChange={(v) => setLocation((p) => ({ ...p, locationType: v }))} options={LOCATION_TYPES} />
-                      <InlineSlider label="Конкуренты" value={location.competitors} onChange={(v) => setLocation((p) => ({ ...p, competitors: v }))} max={50} unit=" шт" />
-                    </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Локация</span>
+                  <InfoPopover>
                     <BubbleRowFromConfig blockId="type-location-market" subBlockId="market-location" data={bubbleData} />
-                  </>
+                  </InfoPopover>
+                </div>
+                {viewMode === 'model' ? (
+                  <div className="space-y-2">
+                    <SelectField label="Район" value={location.district} onChange={(v) => setLocation((p) => ({ ...p, district: v }))} options={DISTRICTS} />
+                    <SelectField label="Тип локации" value={location.locationType} onChange={(v) => setLocation((p) => ({ ...p, locationType: v }))} options={LOCATION_TYPES} />
+                    <InlineSlider label="Конкуренты" value={location.competitors} onChange={(v) => setLocation((p) => ({ ...p, competitors: v }))} max={50} unit=" шт" />
+                  </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{activeData.address || '—'}</p><p className="text-[11px] text-muted-foreground">Район · Тип локации</p><BubbleRowFromConfig blockId="type-location-market" subBlockId="market-location" data={bubbleData} /></div>
+                  <div><p className="text-sm font-semibold">{activeData.address || '—'}</p><p className="text-[11px] text-muted-foreground">Район · Тип локации</p></div>
                 )}
               </div>
 
               {/* Макс. производительность */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                <div className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">Макс. производительность</span></div>
+                <div className="flex items-center gap-2">
+                  <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Макс. производительность</span>
+                  <InfoPopover>
+                    <BubbleRowFromConfig blockId="type-location-market" subBlockId="productivity" data={bubbleData} />
+                  </InfoPopover>
+                </div>
                 <div>
                   {results && viewMode === 'model' ? (
-                    <>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Блюд/смену: <strong className="text-foreground">{results.kitchenMaxDishes}</strong></p>
-                        <p className="text-xs text-muted-foreground">Напитков/смену: <strong className="text-foreground">{results.coffeeMaxDrinks}</strong></p>
-                        <p className="text-xs text-muted-foreground">Гостей max/день: <strong className="text-foreground">{results.maxGuestsPerDayFromSeats}</strong></p>
-                        <Badge variant="outline" className="text-[10px] mt-1">Bottleneck: {results.bottleneck}</Badge>
-                      </div>
-                      <BubbleRowFromConfig blockId="type-location-market" subBlockId="productivity" data={bubbleData} />
-                    </>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Блюд/смену: <strong className="text-foreground">{results.kitchenMaxDishes}</strong></p>
+                      <p className="text-xs text-muted-foreground">Напитков/смену: <strong className="text-foreground">{results.coffeeMaxDrinks}</strong></p>
+                      <p className="text-xs text-muted-foreground">Гостей max/день: <strong className="text-foreground">{results.maxGuestsPerDayFromSeats}</strong></p>
+                      <Badge variant="outline" className="text-[10px] mt-1">Bottleneck: {results.bottleneck}</Badge>
+                    </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">Доступно в режиме моделирования</p>
                   )}
@@ -997,7 +1069,14 @@ export default function SuperDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                 {/* Кухня (детали) */}
                 <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                  <div className="flex items-center gap-2"><ChefHat className="h-3.5 w-3.5 text-orange-500" /><span className="text-xs font-medium text-muted-foreground">Кухня</span><Badge variant="outline" className="text-[10px]">{kitchen.cooks} повар · {results?.kitchenMaxDishes ?? '—'} блюд/см</Badge></div>
+                  <div className="flex items-center gap-2">
+                    <ChefHat className="h-3.5 w-3.5 text-orange-500" />
+                    <span className="text-xs font-medium text-muted-foreground">Кухня</span>
+                    <Badge variant="outline" className="text-[10px]">{kitchen.cooks} повар · {results?.kitchenMaxDishes ?? '—'} блюд/см</Badge>
+                    <InfoPopover>
+                      <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="cuisine-stations" data={bubbleData} />
+                    </InfoPopover>
+                  </div>
                   <div className="space-y-2">
                     <InlineSlider label="Количество поваров" value={kitchen.cooks} onChange={(v) => setKitchen((p) => ({ ...p, cooks: v }))} min={1} max={15} unit=" чел" />
                     <InlineSlider label="Параллелизм (станций)" value={kitchen.parallelism} onChange={(v) => setKitchen((p) => ({ ...p, parallelism: v }))} min={1} max={10} unit=" ст." />
@@ -1011,12 +1090,18 @@ export default function SuperDashboard() {
                     ))}
                     <InlineSlider label="Блюд на гостя" value={common.avgDishesPerGuest} onChange={(v) => setCommon((p) => ({ ...p, avgDishesPerGuest: v }))} max={5} step={0.1} unit=" шт" />
                   </div>
-                  <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="cuisine-stations" data={bubbleData} />
                 </div>
 
                 {/* Бар / Кофейная станция (детали) */}
                 <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                  <div className="flex items-center gap-2"><Coffee className="h-3.5 w-3.5 text-amber-600" /><span className="text-xs font-medium text-muted-foreground">Бар / Кофейная станция</span><Badge variant="outline" className="text-[10px]">{coffee.baristas} бариста · {results?.coffeeMaxDrinks ?? '—'} нап/см</Badge></div>
+                  <div className="flex items-center gap-2">
+                    <Coffee className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="text-xs font-medium text-muted-foreground">Бар / Кофейная станция</span>
+                    <Badge variant="outline" className="text-[10px]">{coffee.baristas} бариста · {results?.coffeeMaxDrinks ?? '—'} нап/см</Badge>
+                    <InfoPopover>
+                      <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="bar-station" data={bubbleData} />
+                    </InfoPopover>
+                  </div>
                   <div className="space-y-2">
                     <InlineSlider label="Количество бариста" value={coffee.baristas} onChange={(v) => setCoffee((p) => ({ ...p, baristas: v }))} min={0} max={10} unit=" чел" />
                     <InlineSlider label="Зарплата бариста" value={hall.baristaSalary} onChange={(v) => setHall((p) => ({ ...p, baristaSalary: v }))} max={150000} step={5000} unit=" ₽" />
@@ -1024,12 +1109,18 @@ export default function SuperDashboard() {
                     <InlineSlider label="Средняя цена напитка" value={coffee.drinkPrice} onChange={(v) => setCoffee((p) => ({ ...p, drinkPrice: v }))} max={2000} step={25} unit=" ₽" />
                     <InlineSlider label="Напитков на гостя" value={common.avgDrinksPerGuest} onChange={(v) => setCommon((p) => ({ ...p, avgDrinksPerGuest: v }))} max={5} step={0.1} unit=" шт" />
                   </div>
-                  <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="bar-station" data={bubbleData} />
                 </div>
 
                 {/* Энергетика и климат (детали) */}
                 <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                  <div className="flex items-center gap-2"><Thermometer className="h-3.5 w-3.5 text-blue-500" /><span className="text-xs font-medium text-muted-foreground">Энергетика и климат</span><Badge variant="outline" className="text-[10px]">{fmt(Math.round(results?.totalEnergyCost ?? 0))} ₽/мес</Badge></div>
+                  <div className="flex items-center gap-2">
+                    <Thermometer className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-xs font-medium text-muted-foreground">Энергетика и климат</span>
+                    <Badge variant="outline" className="text-[10px]">{fmt(Math.round(results?.totalEnergyCost ?? 0))} ₽/мес</Badge>
+                    <InfoPopover>
+                      <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="climate-energy" data={bubbleData} />
+                    </InfoPopover>
+                  </div>
                   <div className="space-y-2">
                     <SelectField label="Тип кухни" value={energy.kitchenType} onChange={(v) => setEnergy((p) => ({ ...p, kitchenType: v }))} options={[{ value: 'hot', label: 'Горячая (37.5 Вт/м²)' }, { value: 'cold', label: 'Холодная (17.5 Вт/м²)' }, { value: 'mixed', label: 'Смешанная (27.5 Вт/м²)' }]} />
                     <InlineSlider label="Мин. температура (зимний)" value={energy.climateZone} onChange={(v) => setEnergy((p) => ({ ...p, climateZone: v }))} min={-50} max={10} unit=" °C" />
@@ -1038,18 +1129,23 @@ export default function SuperDashboard() {
                     <InlineSlider label="Тариф электроэнергии" value={energy.electricityPrice} onChange={(v) => setEnergy((p) => ({ ...p, electricityPrice: v }))} max={20} step={0.5} unit=" ₽/кВт" />
                     <InlineSlider label="Прочее оборудование" value={energy.otherPower} onChange={(v) => setEnergy((p) => ({ ...p, otherPower: v }))} max={200} unit=" кВт" />
                   </div>
-                  <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="climate-energy" data={bubbleData} />
                 </div>
 
                 {/* График работы (детали) */}
                 <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                  <div className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-violet-500" /><span className="text-xs font-medium text-muted-foreground">График работы</span><Badge variant="outline" className="text-[10px]">{results?.shifts ?? '—'} смен · {common.operatingHours} ч</Badge></div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 text-violet-500" />
+                    <span className="text-xs font-medium text-muted-foreground">График работы</span>
+                    <Badge variant="outline" className="text-[10px]">{results?.shifts ?? '—'} смен · {common.operatingHours} ч</Badge>
+                    <InfoPopover>
+                      <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="staff-schedule" data={bubbleData} />
+                    </InfoPopover>
+                  </div>
                   <div className="space-y-2">
                     <InlineSlider label="Часов работы / день" value={common.operatingHours} onChange={(v) => setCommon((p) => ({ ...p, operatingHours: v }))} min={4} max={24} unit=" ч" />
                     <InlineSlider label="Часов в смене" value={common.shiftHours} onChange={(v) => setCommon((p) => ({ ...p, shiftHours: v }))} min={4} max={16} unit=" ч" />
                     <p className="text-xs text-muted-foreground">Расчётных смен: <strong>{results?.shifts ?? '—'}</strong></p>
                   </div>
-                  <BubbleRowFromConfig blockId="kitchen-bar" subBlockId="staff-schedule" data={bubbleData} />
                 </div>
               </div>
             )}
