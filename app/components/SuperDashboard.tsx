@@ -6,7 +6,7 @@ import {
   UtensilsCrossed, Users, Building2, ChefHat, Lightbulb, Database,
   SlidersHorizontal, Armchair, Coffee, Flame, Gauge, Zap,
   Clock, DollarSign, Target, ShieldAlert, ArrowUp, MapPin, Store,
-  ShoppingBag, UserCog, Thermometer, Receipt, PieChart,
+  ShoppingBag, UserCog, Thermometer, Receipt, PieChart, BarChart3,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -698,22 +698,23 @@ export default function SuperDashboard() {
           </div>
 
           {/* KPI */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-semibold text-foreground">Ключевые показатели</span>
-                <InfoPopover>
-                  <BubbleRowFromConfig blockId="kpi" data={bubbleData} />
-                </InfoPopover>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <KPICard icon={Wallet} label={viewMode === 'model' ? 'Выручка / мес' : 'Дневная выручка'} value={viewMode === 'model' ? `${fmt(activeData.revenue)} ₽` : `${fmt(Math.round(activeData.revenue / 30))} ₽`} sub={viewMode === 'model' ? undefined : `${fmt(activeData.revenue)} ₽/мес`} colorLevel="neutral" />
-                <KPICard icon={UtensilsCrossed} label="Стоимость продуктов" value={`${formatPercent(activeData.foodCostPercent)}%`} sub={`${fmt(activeData.costOfGoods)} ₽`} colorLevel={getColorLevel('foodCostPercent', activeData.foodCostPercent).color} />
-                <KPICard icon={Building2} label="Аренда + Коммунал." value={`${formatPercent(activeData.rentPercent + activeData.utilitiesPercent)}%`} sub={`${fmt(activeData.rent + activeData.utilities)} ₽`} colorLevel={getColorLevel('rentPercent', activeData.rentPercent).color} />
-                <KPICard icon={Users} label="Сотрудников / ФОТ" value={`${activeData.staffCount} чел`} sub={`${formatPercent(activeData.payrollPercent)}%`} colorLevel={getColorLevel('payrollPercent', activeData.payrollPercent).color} />
-                <KPICard icon={Receipt} label="Прочие расходы" value={`${formatPercent(activeData.otherPercent + activeData.managementPercent)}%`} sub={`${fmt(activeData.otherExpenses + activeData.managementCosts)} ₽`} colorLevel={activeData.otherPercent > 10 ? 'orange' : 'neutral'} />
-                <KPICard icon={PiggyBank} label="Прибыль" value={`${formatPercent(activeData.profitPercent)}%`} sub={`${fmt(activeData.operatingProfit)} ₽`} colorLevel={getColorLevel('profitPercent', activeData.profitPercent).color} />
-              </div>
-            </div>
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <span className="text-lg font-bold text-foreground">Ключевые показатели</span>
+            <InfoPopover>
+              <BubbleRowFromConfig blockId="kpi" data={bubbleData} />
+            </InfoPopover>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <KPICard icon={Wallet} label={viewMode === 'model' ? 'Выручка / мес' : 'Дневная выручка'} value={viewMode === 'model' ? `${fmt(activeData.revenue)} ₽` : `${fmt(Math.round(activeData.revenue / 30))} ₽`} sub={viewMode === 'model' ? undefined : `${fmt(activeData.revenue)} ₽/мес`} colorLevel="neutral" />
+            <KPICard icon={UtensilsCrossed} label="Стоимость продуктов" value={`${formatPercent(activeData.foodCostPercent)}%`} sub={`${fmt(activeData.costOfGoods)} ₽`} colorLevel={getColorLevel('foodCostPercent', activeData.foodCostPercent).color} />
+            <KPICard icon={Building2} label="Аренда + Коммунал." value={`${formatPercent(activeData.rentPercent + activeData.utilitiesPercent)}%`} sub={`${fmt(activeData.rent + activeData.utilities)} ₽`} colorLevel={getColorLevel('rentPercent', activeData.rentPercent).color} />
+            <KPICard icon={Users} label="Сотрудников / ФОТ" value={`${activeData.staffCount} чел`} sub={`${formatPercent(activeData.payrollPercent)}%`} colorLevel={getColorLevel('payrollPercent', activeData.payrollPercent).color} />
+            <KPICard icon={Receipt} label="Прочие расходы" value={`${formatPercent(activeData.otherPercent + activeData.managementPercent)}%`} sub={`${fmt(activeData.otherExpenses + activeData.managementCosts)} ₽`} colorLevel={activeData.otherPercent > 10 ? 'orange' : 'neutral'} />
+            <KPICard icon={PiggyBank} label="Прибыль" value={`${formatPercent(activeData.profitPercent)}%`} sub={`${fmt(activeData.operatingProfit)} ₽`} colorLevel={getColorLevel('profitPercent', activeData.profitPercent).color} />
+          </div>
+        </div>
 
         </div>
         {/* Конец Sticky Header */}
