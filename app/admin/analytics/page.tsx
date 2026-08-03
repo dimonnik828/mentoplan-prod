@@ -6,7 +6,7 @@ import {
   Activity, MousePointerClick, Eye, Clock, Zap, ShieldAlert,
   Terminal, BarChart3, Globe, Users, AlertTriangle, TrendingUp,
   ArrowRight, Server, Timer, FileWarning, MousePointer, ScrollText,
-  ArrowDownUp, LayoutDashboard, RefreshCw,
+  ArrowDownUp, LayoutDashboard, RefreshCw, Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -54,6 +54,13 @@ interface ProcessEntry {
   timestamp: number;
   sessionId: string;
   data: Record<string, unknown>;
+}
+
+interface ContactMessage {
+  id: string;
+  name: string;
+  message: string;
+  createdAt: string;
 }
 
 /* ─── Helpers ─── */
@@ -129,6 +136,60 @@ function Empty({ text }: { text: string }) {
   return <p className="text-xs text-muted-foreground text-center py-10">{text}</p>;
 }
 
+/* ─── Messages Component ─── */
+function AdminMessages() {
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/contact')
+      .then(r => r.json())
+      .then(data => setMessages(Array.isArray(data) ? data : []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const deleteMessage = async (id: string) => {
+    await fetch(`/api/contact?id=${id}`, { method: 'DELETE' });
+    setMessages(prev => prev.filter(m => m.id !== id));
+  };
+
+  if (loading) return <Skeleton className="h-24 rounded-xl" />;
+
+  return (
+    <div className="space-y-4">
+      {messages.length === 0 ? (
+        <Empty text="Сообщений пока нет" />
+      ) : (
+        messages.map((msg) => (
+          <Card key={msg.id}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold">{msg.name}</CardTitle>
+                  <Badge variant="outline" className="text-[10px]">
+                    {new Date(msg.createdAt).toLocaleString('ru-RU')}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteMessage(msg.id)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{msg.message}</p>
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Main Page
    ═══════════════════════════════════════════════════════════════ */
@@ -148,14 +209,14 @@ export default function AdminAnalyticsPage() {
   const [timeline, setTimeline] = useState<any[]>([]);
 
   const fetchSection = useCallback(async (section: string) => {
-  try {
-    const r = await fetch(`/api/admin/analytics/data?section=${section}`, {
-      credentials: 'same-origin',   // <-- добавлено
-    });
-    if (!r.ok) throw new Error('Unauthorized');
-    const t = await r.text();
-    try { return JSON.parse(t); } catch { return null; }
-  } catch { return null; }
+    try {
+      const r = await fetch(`/api/admin/analytics/data?section=${section}`, {
+        credentials: 'same-origin',
+      });
+      if (!r.ok) throw new Error('Unauthorized');
+      const t = await r.text();
+      try { return JSON.parse(t); } catch { return null; }
+    } catch { return null; }
   }, []);
 
   const reload = useCallback(async () => {
@@ -240,6 +301,7 @@ export default function AdminAnalyticsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {[
               { key: 'overview', label: 'Обзор', icon: LayoutDashboard },
+              { key: 'messages', label: 'Сообщения', icon: Mail },
               { key: 'behavior', label: 'Поведение', icon: MousePointer },
               { key: 'performance', label: 'Производительность', icon: Zap },
               { key: 'security', label: 'Безопасность', icon: ShieldAlert },
@@ -274,6 +336,9 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
         </div>
+
+        {/* ═══════ MESSAGES ═══════ */}
+        {tab === 'messages' && <AdminMessages />}
 
         {/* ═══════ OVERVIEW ═══════ */}
         {tab === 'overview' && (

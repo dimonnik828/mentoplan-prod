@@ -175,3 +175,10 @@ model AnalyticsEvent {
   @@index([timestamp])
   @@map("analytics_events")
 }
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  message   String
+  createdAt DateTime @default(now())
+}

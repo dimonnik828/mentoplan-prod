@@ -9,14 +9,22 @@ import {
   Menu,
   X,
   ChevronDown,
+  Shield,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 export function HeaderNav() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const adminDropdownRef = useRef<HTMLDivElement>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Проверка авторизации админа
+  useEffect(() => {
+    const token = document.cookie.split('; ').find(row => row.startsWith('admin_token='));
+    setIsAdmin(token?.split('=')[1] === 'true');
+  }, [pathname]);
 
   const linkClassName = (href: string) =>
     cn(
@@ -26,20 +34,20 @@ export function HeaderNav() {
         : 'text-muted-foreground hover:bg-accent hover:text-foreground'
     );
 
-  const isAuditActive = pathname === '/' || pathname === '/business';
+  const isAdminActive = pathname.startsWith('/admin');
 
   // Закрываем dropdown при клике вне
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setAuditOpen(false);
+      if (adminDropdownRef.current && !adminDropdownRef.current.contains(event.target as Node)) {
+        setAdminOpen(false);
       }
     };
-    if (auditOpen) {
+    if (adminOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [auditOpen]);
+  }, [adminOpen]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -57,51 +65,59 @@ export function HeaderNav() {
 
         {/* Десктопная навигация */}
         <nav className="hidden md:flex items-center gap-1">
-          {/* Выпадающий "Аудит" */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setAuditOpen(!auditOpen)}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isAuditActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-              )}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Аудит
-              <ChevronDown className={cn('h-3.5 w-3.5 opacity-50 transition-transform', auditOpen && 'rotate-180')} />
-            </button>
-            {auditOpen && (
-              <div className="absolute top-full left-0 mt-1 w-48 rounded-md border bg-popover p-1 shadow-md z-50">
-                <Link
-                  href="/"
-                  onClick={() => setAuditOpen(false)}
-                  className={cn(
-                    'block rounded-md px-3 py-2 text-sm transition-colors',
-                    pathname === '/' ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'
-                  )}
-                >
-                  Экспресс-аудит
-                </Link>
-                <Link
-                  href="/business"
-                  onClick={() => setAuditOpen(false)}
-                  className={cn(
-                    'block rounded-md px-3 py-2 text-sm transition-colors',
-                    pathname === '/business' ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'
-                  )}
-                >
-                  Расширенный аудит
-                </Link>
-              </div>
-            )}
-          </div>
+          {/* Аудит — одна ссылка на /super */}
+          <Link href="/super" className={linkClassName('/super')}>
+            <LayoutDashboard className="h-4 w-4" />
+            Аудит
+          </Link>
 
           <Link href="/about" className={linkClassName('/about')}>
             <Info className="h-4 w-4" />
             О проекте
           </Link>
+
+          {/* Админское меню — только для авторизованных */}
+          {isAdmin && (
+            <div className="relative" ref={adminDropdownRef}>
+              <button
+                onClick={() => setAdminOpen(!adminOpen)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isAdminActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                Админ
+                <ChevronDown className={cn('h-3.5 w-3.5 opacity-50 transition-transform', adminOpen && 'rotate-180')} />
+              </button>
+              {adminOpen && (
+                <div className="absolute top-full left-0 mt-1 w-48 rounded-md border bg-popover p-1 shadow-md z-50">
+                  <Link
+                    href="/admin/analytics"
+                    onClick={() => setAdminOpen(false)}
+                    className={cn(
+                      'block rounded-md px-3 py-2 text-sm transition-colors',
+                      pathname === '/admin/analytics' ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'
+                    )}
+                  >
+                    Аналитика
+                  </Link>
+                  <Link
+                    href="/admin/messages"
+                    onClick={() => setAdminOpen(false)}
+                    className={cn(
+                      'block rounded-md px-3 py-2 text-sm transition-colors',
+                      pathname === '/admin/messages' ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-accent'
+                    )}
+                  >
+                    Сообщения
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* Мобильная кнопка */}
@@ -117,18 +133,28 @@ export function HeaderNav() {
       {/* Мобильное меню */}
       {mobileOpen && (
         <div className="md:hidden border-t bg-background px-4 pb-4 pt-2 space-y-1">
-          <div className="py-2 text-sm font-medium text-muted-foreground">Аудит</div>
-          <Link href="/" onClick={() => setMobileOpen(false)} className={linkClassName('/')}>
-            Экспресс-аудит
-          </Link>
-          <Link href="/business" onClick={() => setMobileOpen(false)} className={linkClassName('/business')}>
-            Расширенный аудит
+          <Link href="/super" onClick={() => setMobileOpen(false)} className={linkClassName('/super')}>
+            <LayoutDashboard className="h-4 w-4" />
+            Аудит
           </Link>
 
           <Link href="/about" onClick={() => setMobileOpen(false)} className={linkClassName('/about')}>
             <Info className="h-4 w-4" />
             О проекте
           </Link>
+
+          {/* Админ-меню в мобильной версии */}
+          {isAdmin && (
+            <>
+              <div className="py-2 text-sm font-medium text-muted-foreground">Админ</div>
+              <Link href="/admin/analytics" onClick={() => setMobileOpen(false)} className={linkClassName('/admin/analytics')}>
+                Аналитика
+              </Link>
+              <Link href="/admin/messages" onClick={() => setMobileOpen(false)} className={linkClassName('/admin/messages')}>
+                Сообщения
+              </Link>
+            </>
+          )}
         </div>
       )}
     </header>

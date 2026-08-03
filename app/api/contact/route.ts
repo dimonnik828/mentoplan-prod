@@ -1,65 +1,59 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-// Хранилище для отслеживания запросов (в памяти, сбрасывается при перезапуске)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const MAX_REQUESTS = 3;          // максимум сообщений
-const WINDOW_MS = 10 * 60 * 1000; // за 10 минут
-
-export async function POST(request: NextRequest) {
+// POST — сохранить сообщение
+export async function POST(request: Request) {
   try {
-    // 1. Получаем IP отправителя
-    const forwarded = request.headers.get('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
-
-    // 2. Проверяем лимит
-    const now = Date.now();
-    const record = rateLimitMap.get(ip);
-
-    if (record && now < record.resetTime) {
-      if (record.count >= MAX_REQUESTS) {
-        return NextResponse.json(
-          { error: 'Слишком много сообщений. Попробуйте позже.' },
-          { status: 429 }
-        );
-      }
-      record.count++;
-    } else {
-      // Новый интервал
-      rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
-    }
-
-    // 3. Обрабатываем форму
     const body = await request.json();
-    const { name, email, message } = body;
+    const { name, message } = body;
 
-    if (!message) {
-      return NextResponse.json({ error: 'Сообщение обязательно' }, { status: 400 });
+    if (!message || message.trim().length === 0) {
+      return NextResponse.json({ error: 'Сообщение не может быть пустым' }, { status: 400 });
     }
 
-    const text = `📩 Новое сообщение с mentoplan.ru\n\n👤 Имя: ${name || 'не указано'}\n💬 Сообщение:\n${message}`;
+    const contact = await prisma.contactMessage.create({
+      data: {
+        name: name || 'Аноним',
+        message: message.trim(),
+        createdAt: new Date(),
+      },
+    });
 
-    const tgResponse = await fetch(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: process.env.TELEGRAM_CHAT_ID,
-          text,
-          parse_mode: 'HTML',
-        }),
-      }
-    );
-
-    if (!tgResponse.ok) {
-      const errData = await tgResponse.json();
-      console.error('Telegram API error:', errData);
-      throw new Error('Ошибка отправки в Telegram');
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, id: contact.id });
   } catch (error) {
     console.error('Contact form error:', error);
-    return NextResponse.json({ error: 'Не удалось отправить сообщение' }, { status: 500 });
+    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
+  }
+}
+
+// GET — получить все сообщения
+export async function GET() {
+  try {
+    const messages = await prisma.contactMessage.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return NextResponse.json(messages);
+  } catch (error) {
+    console.error('Contact GET error:', error);
+    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
+  }
+}
+
+// DELETE — удалить сообщение по id
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID не указан' }, { status: 400 });
+    }
+
+    await prisma.contactMessage.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Contact DELETE error:', error);
+    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }
 }

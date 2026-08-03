@@ -47,6 +47,7 @@ type BusinessData = {
   otherExpenses: number; operatingProfit: number; foodCostPercent: number; payrollPercent: number;
   rentPercent: number; utilitiesPercent: number; managementPercent: number; otherPercent: number;
   profitPercent: number; healthIndex: number;
+  marketingExpenses: number; wasteLosses: number; deliveryCommission: number; staffTurnoverRate: number;
 };
 
 interface Dish { id: string; name: string; time: number; price: number; }
@@ -67,6 +68,7 @@ const defaultBusiness: BusinessData = {
   otherExpenses: 0, operatingProfit: 0, foodCostPercent: 0, payrollPercent: 0,
   rentPercent: 0, utilitiesPercent: 0, managementPercent: 0, otherPercent: 0,
   profitPercent: 0, healthIndex: 0,
+  marketingExpenses: 0, wasteLosses: 0, deliveryCommission: 0, staffTurnoverRate: 0,
 };
 
 const VENUE_LABELS: Record<string, string> = {
@@ -100,6 +102,10 @@ const FIELD_LABELS: Record<string, string> = {
   avgCheck: 'Средний чек', rent: 'Аренда', utilities: 'Коммунальные',
   payroll: 'ФОТ', managementCosts: 'Управление',
   costOfGoods: 'Foodcost', otherExpenses: 'Прочие расходы',
+  marketingExpenses: 'Маркетинг (₽/мес)',
+  wasteLosses: 'Потери / списания (₽/мес)',
+  deliveryCommission: 'Комиссия доставки (₽/мес)',
+  staffTurnoverRate: 'Текучесть кадров (% в мес)',
 };
 
 /* ==================================================================
@@ -132,6 +138,10 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const managementCosts = data.managementCosts ?? 0;
   const costOfGoods = data.costOfGoods ?? 0;
   const otherExpenses = data.otherExpenses ?? 0;
+  const marketingExpenses = data.marketingExpenses ?? 0;
+  const wasteLosses = data.wasteLosses ?? 0;
+  const deliveryCommission = data.deliveryCommission ?? 0;
+  const staffTurnoverRate = data.staffTurnoverRate ?? 0;
   const foodCostPercent = revenue ? Math.round((costOfGoods / revenue) * 100) : 0;
   const payrollPercent = revenue ? Math.round((payroll / revenue) * 100) : 0;
   const rentPercent = revenue ? Math.round((rent / revenue) * 100) : 0;
@@ -150,7 +160,8 @@ const recalcBusiness = (data: Partial<BusinessData>): BusinessData => {
   const healthIndex = healthMetrics.length > 0 ? Math.round((greenCount / healthMetrics.length) * 100) : 0;
   return {
     ...defaultBusiness, ...data, revenue, rent, utilities, payroll, managementCosts,
-    costOfGoods, otherExpenses, operatingProfit, foodCostPercent, payrollPercent, rentPercent,
+    costOfGoods, otherExpenses, marketingExpenses, wasteLosses, deliveryCommission, staffTurnoverRate,
+    operatingProfit, foodCostPercent, payrollPercent, rentPercent,
     utilitiesPercent, managementPercent, otherPercent, profitPercent, healthIndex,
   };
 };
@@ -230,6 +241,7 @@ function InfoPopover({ children }: { children: React.ReactNode }) {
     </Popover>
   );
 }
+
 function KPICard({ icon: Icon, label, value, sub, colorLevel = 'neutral' }: {
   icon: React.ElementType; label: string; value: string; sub?: string; colorLevel?: ColorLevel;
 }) {
@@ -398,9 +410,9 @@ function DataModal({ open, onOpenChange, data, onSave }: {
                 <Input type="text" value={String(form[f] ?? '')} onChange={(e) => set(f, e.target.value)} />
               </div>
             ))}
-            {['revenue', 'rent', 'utilities', 'payroll', 'managementCosts', 'costOfGoods', 'otherExpenses'].map((f) => (
+            {['revenue', 'rent', 'utilities', 'payroll', 'managementCosts', 'costOfGoods', 'otherExpenses', 'marketingExpenses', 'wasteLosses', 'deliveryCommission', 'staffTurnoverRate'].map((f) => (
               <div key={f} className="space-y-1.5">
-                <Label>{FIELD_LABELS[f]}</Label>
+                <Label>{FIELD_LABELS[f] || f}</Label>
                 <Input type="number" value={Number(form[f] ?? 0) || ''} onChange={(e) => set(f, e.target.value === '' ? 0 : Number(e.target.value))} />
               </div>
             ))}
@@ -433,6 +445,7 @@ export default function SuperDashboard() {
   const [viewMode, setViewMode] = useState<'real' | 'model'>('real');
 
   const [staffMultiplier, setStaffMultiplier] = useState(1);
+  const [audienceOpen, setAudienceOpen] = useState(false);
   const [hall, setHall] = useState<HallSettings>({
     venueType: 'cafe', seats: 50, avgCheck: 500, hallArea: 75, kitchenArea: 40,
     totalArea: 110, rentPerSqm: 1090, cookSalary: 80000, baristaSalary: 60000,
@@ -638,6 +651,10 @@ export default function SuperDashboard() {
       venueType: activeData.venueType, staffCount: activeData.staffCount,
       maxGuestsPerDayFromSeats: results?.maxGuestsPerDayFromSeats,
       bottleneck: results?.bottleneck,
+      marketingExpenses: activeData.marketingExpenses,
+      wasteLosses: activeData.wasteLosses,
+      deliveryCommission: activeData.deliveryCommission,
+      staffTurnoverRate: activeData.staffTurnoverRate,
     });
   }, [activeData, results]);
 
@@ -698,30 +715,30 @@ export default function SuperDashboard() {
           </div>
 
           {/* KPI */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            <span className="text-lg font-bold text-foreground">Ключевые показатели</span>
-            <InfoPopover>
-              <BubbleRowFromConfig blockId="kpi" data={bubbleData} />
-            </InfoPopover>
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <span className="text-lg font-bold text-foreground">Ключевые показатели</span>
+              <InfoPopover>
+                <BubbleRowFromConfig blockId="kpi" data={bubbleData} />
+              </InfoPopover>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <KPICard icon={Wallet} label={viewMode === 'model' ? 'Выручка / мес' : 'Дневная выручка'} value={viewMode === 'model' ? `${fmt(activeData.revenue)} ₽` : `${fmt(Math.round(activeData.revenue / 30))} ₽`} sub={viewMode === 'model' ? undefined : `${fmt(activeData.revenue)} ₽/мес`} colorLevel="neutral" />
+              <KPICard icon={UtensilsCrossed} label="Стоимость продуктов" value={`${formatPercent(activeData.foodCostPercent)}%`} sub={`${fmt(activeData.costOfGoods)} ₽`} colorLevel={getColorLevel('foodCostPercent', activeData.foodCostPercent).color} />
+              <KPICard icon={Building2} label="Аренда + Коммунал." value={`${formatPercent(activeData.rentPercent + activeData.utilitiesPercent)}%`} sub={`${fmt(activeData.rent + activeData.utilities)} ₽`} colorLevel={getColorLevel('rentPercent', activeData.rentPercent).color} />
+              <KPICard icon={Users} label="Сотрудников / ФОТ" value={`${activeData.staffCount} чел`} sub={`${formatPercent(activeData.payrollPercent)}%`} colorLevel={getColorLevel('payrollPercent', activeData.payrollPercent).color} />
+              <KPICard icon={Receipt} label="Прочие расходы" value={`${formatPercent(activeData.otherPercent + activeData.managementPercent)}%`} sub={`${fmt(activeData.otherExpenses + activeData.managementCosts)} ₽`} colorLevel={activeData.otherPercent > 10 ? 'orange' : 'neutral'} />
+              <KPICard icon={PiggyBank} label="Прибыль" value={`${formatPercent(activeData.profitPercent)}%`} sub={`${fmt(activeData.operatingProfit)} ₽`} colorLevel={getColorLevel('profitPercent', activeData.profitPercent).color} />
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <KPICard icon={Wallet} label={viewMode === 'model' ? 'Выручка / мес' : 'Дневная выручка'} value={viewMode === 'model' ? `${fmt(activeData.revenue)} ₽` : `${fmt(Math.round(activeData.revenue / 30))} ₽`} sub={viewMode === 'model' ? undefined : `${fmt(activeData.revenue)} ₽/мес`} colorLevel="neutral" />
-            <KPICard icon={UtensilsCrossed} label="Стоимость продуктов" value={`${formatPercent(activeData.foodCostPercent)}%`} sub={`${fmt(activeData.costOfGoods)} ₽`} colorLevel={getColorLevel('foodCostPercent', activeData.foodCostPercent).color} />
-            <KPICard icon={Building2} label="Аренда + Коммунал." value={`${formatPercent(activeData.rentPercent + activeData.utilitiesPercent)}%`} sub={`${fmt(activeData.rent + activeData.utilities)} ₽`} colorLevel={getColorLevel('rentPercent', activeData.rentPercent).color} />
-            <KPICard icon={Users} label="Сотрудников / ФОТ" value={`${activeData.staffCount} чел`} sub={`${formatPercent(activeData.payrollPercent)}%`} colorLevel={getColorLevel('payrollPercent', activeData.payrollPercent).color} />
-            <KPICard icon={Receipt} label="Прочие расходы" value={`${formatPercent(activeData.otherPercent + activeData.managementPercent)}%`} sub={`${fmt(activeData.otherExpenses + activeData.managementCosts)} ₽`} colorLevel={activeData.otherPercent > 10 ? 'orange' : 'neutral'} />
-            <KPICard icon={PiggyBank} label="Прибыль" value={`${formatPercent(activeData.profitPercent)}%`} sub={`${fmt(activeData.operatingProfit)} ₽`} colorLevel={getColorLevel('profitPercent', activeData.profitPercent).color} />
-          </div>
-        </div>
 
         </div>
         {/* Конец Sticky Header */}
 
         {/* ============================================================
-    БЛОК 0: ДИАГНОСТИКА И ТОЧКИ РОСТА (САМЫЙ ВЕРХ)
-    ============================================================ */}
+            БЛОК 0: ДИАГНОСТИКА И ТОЧКИ РОСТА (САМЫЙ ВЕРХ)
+            ============================================================ */}
         {diagnostics && (
           <Card className="mb-6 py-0 gap-0">
             <CardHeader className="pb-0">
@@ -762,8 +779,8 @@ export default function SuperDashboard() {
         )}
 
         {/* ============================================================
-    БЛОК 1: ВОЗМОЖНОСТИ (СВОРАЧИВАЕМЫЙ)
-    ============================================================ */}
+            БЛОК 1: ВОЗМОЖНОСТИ (СВОРАЧИВАЕМЫЙ)
+            ============================================================ */}
         {(recommendations.length > 0 || diagnostics) && (
           <Accordion type="single" defaultValue="possibilities" className="mb-6">
             <AccordionItem value="possibilities" className="border rounded-lg bg-card">
@@ -776,7 +793,6 @@ export default function SuperDashboard() {
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
                 <div className="space-y-3 pt-2">
-                  {/* InfoPopover перенесён сюда */}
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xs text-muted-foreground">Справка:</span>
                     <InfoPopover>
@@ -842,8 +858,8 @@ export default function SuperDashboard() {
         )}
 
         {/* ============================================================
-    БЛОК 2: СТРУКТУРА ВЫРУЧКИ (СВОРАЧИВАЕМЫЙ)
-    ============================================================ */}
+            БЛОК 2: СТРУКТУРА ВЫРУЧКИ (СВОРАЧИВАЕМЫЙ)
+            ============================================================ */}
         <Accordion type="single" defaultValue="revenue-structure" className="mb-6">
           <AccordionItem value="revenue-structure" className="border rounded-lg bg-card">
             <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -854,7 +870,6 @@ export default function SuperDashboard() {
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="pt-2 space-y-1">
-                {/* InfoPopover перенесён сюда */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs text-muted-foreground">Справка:</span>
                   <InfoPopover>
@@ -889,7 +904,7 @@ export default function SuperDashboard() {
         </Accordion>
 
         {/* ============================================================
-            БЛОК 3: ТИП, ЛОКАЦИЯ И РЫНОК (все блоки в едином формате)
+            БЛОК 3: ТИП, ЛОКАЦИЯ И РЫНОК
             ============================================================ */}
         <Card className="mb-6 py-0 gap-0">
           <CardHeader className="pb-0">
@@ -899,7 +914,6 @@ export default function SuperDashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-4">
-            {/* Первый ряд */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Тип заведения */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
@@ -980,7 +994,6 @@ export default function SuperDashboard() {
               </div>
             </div>
 
-            {/* Второй ряд */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
               {/* Foodcost */}
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
@@ -1037,8 +1050,20 @@ export default function SuperDashboard() {
                     <InlineSlider label="Конкуренты" value={location.competitors} onChange={(v) => setLocation((p) => ({ ...p, competitors: v }))} max={50} unit=" шт" />
                   </div>
                 ) : (
-                  <div><p className="text-sm font-semibold">{activeData.address || '—'}</p><p className="text-[11px] text-muted-foreground">Район · Тип локации</p></div>
+                  <div>
+                    <p className="text-sm font-semibold">{activeData.address || '—'}</p>
+                    <p className="text-[11px] text-muted-foreground">Район · Тип локации</p>
+                  </div>
                 )}
+                {/* Кликабельная подсказка через <details> */}
+                <details className="mt-2">
+                  <summary className="py-1 text-xs font-medium text-primary hover:underline cursor-pointer list-none">
+                    Как оценить аудиторию ▼
+                  </summary>
+                  <div className="text-xs text-muted-foreground leading-relaxed mt-1 pl-2 border-l-2 border-primary/30">
+                    Потенциальная аудитория = Общее население/поток × % целевой аудитории × % конверсии в общепит. Доступный поток = Потенциал / (1 + Конкуренты × Влияние). Влияние: 0.2-0.4 локальные, 0.5-0.8 сетевые. Данные: mosmap.ru/report/infra.html
+                  </div>
+                </details>
               </div>
 
               {/* Макс. производительность */}
@@ -1065,7 +1090,6 @@ export default function SuperDashboard() {
               </div>
             </div>
 
-            {/* Третий ряд — только в режиме моделирования */}
             {viewMode === 'model' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                 {/* Кухня (детали) */}

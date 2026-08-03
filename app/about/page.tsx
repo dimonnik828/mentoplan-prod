@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Users, Code2, Mail, TrendingUp, PieChart, ChefHat, Wrench, Megaphone, Clock, ShieldAlert } from 'lucide-react';
+import { Users, Mail, TrendingUp, PieChart, ChefHat, Megaphone } from 'lucide-react';
 import { ContactForm } from '@/components/contact-form';
 
 export const metadata: Metadata = {
@@ -11,19 +11,12 @@ export const metadata: Metadata = {
 
 const features = [
   {
-    icon: Clock,
-    title: 'Экспресс-аудит',
-    status: 'available' as const,
-    benefit: 'Моментальная диагностика',
-    description: 'За 3 минуты вы получаете ключевые метрики: рентабельность, долю foodcost и ФОТ. Система сразу подсветит критические зоны и даст первые рекомендации, не требуя долгой настройки. Идеально для быстрой проверки перед оперативными решениями.',
-  },
-  {
     icon: TrendingUp,
-    title: 'Расширенный аудит',
+    title: 'Аудит',
     status: 'available' as const,
-    benefit: 'Глубокий анализ с прогнозом',
+    benefit: 'Экспресс и расширенный в одном инструменте',
     description:
-    'Моделируйте зал, кухню, бар, локацию и аренду. Оценивайте реальную ёмкость рынка, влияние конкурентов и потенциальную прибыль. Вы сможете рассчитать, как изменения штата, меню или цен повлияют на выручку и прибыль, и увидеть потенциал роста до принятия решений.',
+      'Экспресс-аудит: за 3 минуты вы получаете ключевые метрики — рентабельность, долю foodcost и ФОТ. Система подсветит критические зоны и даст первые рекомендации. Расширенный аудит: моделируйте зал, кухню, бар, локацию и аренду. Оценивайте реальную ёмкость рынка, влияние конкурентов и потенциальную прибыль. Рассчитывайте, как изменения штата, меню или цен повлияют на выручку.',
   },
   {
     icon: ChefHat,
@@ -38,13 +31,6 @@ const features = [
     status: 'soon' as const,
     benefit: 'Следите за динамикой бизнеса',
     description: 'Сохраняйте результаты всех проверок. Сравнивайте показатели по месяцам, отслеживайте тренды. Вы будете видеть, как ваши решения влияют на прибыль, и доказывать эффективность партнёрам или инвесторам.',
-  },
-  {
-    icon: Wrench,
-    title: 'Диагностика',
-    status: 'soon' as const,
-    benefit: 'Автоматический поиск узких мест',
-    description: 'Система сама проверяет целостность ваших данных и логику расчётов. Вы получите список подозрительных показателей с пояснениями — без привлечения бухгалтера или консультанта.',
   },
   {
     icon: Megaphone,
@@ -115,7 +101,6 @@ export default function AboutPage() {
             </p>
           </CardContent>
         </Card>
-
 
         {/* Контакты */}
         <Card>

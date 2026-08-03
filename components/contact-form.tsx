@@ -3,95 +3,66 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { User, MessageSquare, Loader2, Send } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export function ContactForm() {
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('loading');
-    setErrorMsg('');
+    if (!message.trim()) return;
 
+    setLoading(true);
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email: '', message }),
+        body: JSON.stringify({ name: name.trim() || 'Аноним', message: message.trim() }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Ошибка отправки');
+      if (res.ok) {
+        toast.success('Сообщение отправлено! Мы ответим вам в ближайшее время.');
+        setName('');
+        setMessage('');
+      } else {
+        toast.error('Ошибка отправки. Попробуйте позже.');
       }
-
-      setStatus('success');
-      setName('');
-      setMessage('');
-    } catch (err: any) {
-      setStatus('error');
-      setErrorMsg(err.message || 'Что-то пошло не так');
+    } catch {
+      toast.error('Ошибка сети. Проверьте подключение.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Send className="h-5 w-5 text-primary" />
-          Написать нам
-        </CardTitle>
-        <CardDescription>
-          Ваше сообщение сразу придёт нам в Telegram
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {status === 'success' ? (
-          <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg text-sm">
-            ✅ Спасибо! Сообщение отправлено. Мы скоро ответим.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="relative">
-              <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Ваше имя (необязательно)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <div className="relative">
-              <MessageSquare className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <textarea
-                placeholder="Ваше сообщение..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                required
-                className="pl-9 min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-
-            {status === 'error' && (
-              <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
-                {errorMsg}
-              </div>
-            )}
-
-            <Button type="submit" disabled={status === 'loading'} className="w-full">
-              {status === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Отправить
-            </Button>
-          </form>
-        )}
-      </CardContent>
-    </Card>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="name">Ваше имя (необязательно)</Label>
+        <Input
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Иван Петров"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="message">Сообщение</Label>
+        <Textarea
+          id="message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Опишите ваш вопрос или предложение..."
+          rows={4}
+          required
+        />
+      </div>
+      <Button type="submit" disabled={loading || !message.trim()}>
+        {loading ? 'Отправка...' : 'Отправить сообщение'}
+      </Button>
+    </form>
   );
 }
