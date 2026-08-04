@@ -23,7 +23,8 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
   },
   verification: {
-    yandex: "7614d7c98e06cc37", // ← добавлено
+    yandex: "7614d7c98e06cc37",
+    google: "googlefb1bd9cad0930c1b",
   },
   openGraph: {
     title: "MOMENTO — Аналитика ресторанного бизнеса",
