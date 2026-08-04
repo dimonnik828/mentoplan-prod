@@ -732,7 +732,7 @@ export const GROWTH_HYPOTHESIS_RULES: GrowthHypothesisRule[] = [
     id: 'h10',
     title: 'Оптимизация часов работы',
     description: 'Анализ загрузки по часам и дням недели. Закрытие в нерентабельные часы или изменение формата.',
-    condition: (d) => (d.dailyGuests ?? 0) > 0 && (d.seats ?? 0) > 0 && (d.dailyGuests / d.seats) < 1.5,
+    condition: (d) => (d.dailyGuests ?? 0) > 0 && (d.seats ?? 0) > 0 && ((d.dailyGuests ?? 0) / (d.seats ?? 1)) < 1.5,
     potentialProfit: (d) => d.revenue * 0.02,
     probability: 0.65,
     complexity: 'easy',

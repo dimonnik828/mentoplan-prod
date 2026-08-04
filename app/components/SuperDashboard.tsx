@@ -782,7 +782,7 @@ export default function SuperDashboard() {
             БЛОК 1: ВОЗМОЖНОСТИ (СВОРАЧИВАЕМЫЙ)
             ============================================================ */}
         {(recommendations.length > 0 || diagnostics) && (
-          <Accordion type="single" defaultValue="possibilities" className="mb-6">
+          <Accordion className="mb-6">
             <AccordionItem value="possibilities" className="border rounded-lg bg-card">
               <AccordionTrigger className="px-4 py-3 hover:no-underline">
                 <div className="flex items-center gap-2">
@@ -860,7 +860,7 @@ export default function SuperDashboard() {
         {/* ============================================================
             БЛОК 2: СТРУКТУРА ВЫРУЧКИ (СВОРАЧИВАЕМЫЙ)
             ============================================================ */}
-        <Accordion type="single" defaultValue="revenue-structure" className="mb-6">
+        <Accordion className="mb-6">
           <AccordionItem value="revenue-structure" className="border rounded-lg bg-card">
             <AccordionTrigger className="px-4 py-3 hover:no-underline">
               <div className="flex items-center gap-2">
